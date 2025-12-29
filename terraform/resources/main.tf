@@ -17,25 +17,11 @@ provider "aws" {
   region = var.aws_region
 }
 
-# Build the Go binary
-resource "null_resource" "build_lambda" {
-  triggers = {
-    always_run = timestamp()
-  }
-
-  provisioner "local-exec" {
-    command     = "cd ../../cmd/lambda && set GOOS=linux&& set GOARCH=amd64&& set CGO_ENABLED=0&& go build -o ../../terraform/resources/bootstrap main.go"
-    interpreter = ["PowerShell", "-Command"]
-  }
-}
-
 # Create ZIP archive for Lambda
 data "archive_file" "lambda_zip" {
   type        = "zip"
-  source_file = "${path.module}/bootstrap"
+  source_file = "${path.module}/../../cmd/lambda/bootstrap"
   output_path = "${path.module}/lambda.zip"
-  
-  depends_on = [null_resource.build_lambda]
 }
 
 # IAM role for Lambda
