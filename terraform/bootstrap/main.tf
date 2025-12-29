@@ -239,6 +239,7 @@ resource "aws_iam_policy" "cloudwatch_logs" {
           "logs:DeleteLogGroup",
           "logs:DescribeLogGroups",
           "logs:ListTagsLogGroup",
+          "logs:ListTagsForResource",
           "logs:TagLogGroup",
           "logs:UntagLogGroup",
           "logs:PutRetentionPolicy",
@@ -246,7 +247,8 @@ resource "aws_iam_policy" "cloudwatch_logs" {
         ]
         Resource = [
           "arn:aws:logs:${var.aws_region}:*:log-group:/aws/lambda/bball-app-template-*",
-          "arn:aws:logs:${var.aws_region}:*:log-group:/aws/lambda/bball-app-template-*:*"
+          "arn:aws:logs:${var.aws_region}:*:log-group:/aws/lambda/bball-app-template-*:*",
+          "arn:aws:logs:${var.aws_region}:*:log-group::log-stream:*"
         ]
       }
     ]
