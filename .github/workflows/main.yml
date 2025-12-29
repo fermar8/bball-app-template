@@ -1,0 +1,93 @@
+name: Main CI - Build, Test, and Release
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-test-release:
+    name: Build, Test, and Release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+          cache: true
+
+      - name: Get dependencies
+        run: go mod download
+
+      - name: Run tests
+        run: go test ./... -v -race -coverprofile=coverage.out
+
+      - name: Display test coverage
+        run: go tool cover -func=coverage.out
+
+      - name: Build Lambda binary
+        run: |
+          cd cmd/lambda
+          GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o bootstrap main.go
+          ls -lh bootstrap
+
+      - name: Create ZIP package
+        run: |
+          cd cmd/lambda
+          zip -j ../../bball-app-lambda.zip bootstrap
+          cd ../..
+          ls -lh bball-app-lambda.zip
+
+      - name: Get next version
+        id: version
+        run: |
+          # Get the latest tag, or use v0.0.0 if none exists
+          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          echo "Latest tag: $LATEST_TAG"
+          
+          # Extract version numbers
+          VERSION=${LATEST_TAG#v}
+          IFS='.' read -r -a VERSION_PARTS <<< "$VERSION"
+          MAJOR=${VERSION_PARTS[0]:-0}
+          MINOR=${VERSION_PARTS[1]:-0}
+          PATCH=${VERSION_PARTS[2]:-0}
+          
+          # Increment patch version
+          PATCH=$((PATCH + 1))
+          NEW_VERSION="v${MAJOR}.${MINOR}.${PATCH}"
+          
+          echo "New version: $NEW_VERSION"
+          echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "version_number=${MAJOR}.${MINOR}.${PATCH}" >> $GITHUB_OUTPUT
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ steps.version.outputs.version }}
+          name: Release ${{ steps.version.outputs.version }}
+          body: |
+            ## What's Changed
+            
+            Automated release of version ${{ steps.version.outputs.version }}
+            
+            ### Build Information
+            - Commit: ${{ github.sha }}
+            - Branch: ${{ github.ref_name }}
+            - Go Version: 1.24
+            
+            ### Artifacts
+            - `bball-app-lambda.zip` - Lambda deployment package
+          files: |
+            bball-app-lambda.zip
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
