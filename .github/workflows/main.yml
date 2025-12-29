@@ -1,22 +1,21 @@
-name: Main CI - Build, Test, and Release
+name: Main CI - Build, Test, Deploy, and Release
 
 on:
   push:
     branches:
       - main
+  workflow_dispatch:
 
 jobs:
-  build-test-release:
-    name: Build, Test, and Release
+  build-and-test:
+    name: Build and Test
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: read
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Setup Go
         uses: actions/setup-go@v5
@@ -38,6 +37,145 @@ jobs:
           cd cmd/lambda
           GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o bootstrap main.go
           ls -lh bootstrap
+
+      - name: Upload Lambda binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: lambda-bootstrap
+          path: cmd/lambda/bootstrap
+          retention-days: 1
+
+  deploy-nonlive:
+    name: Deploy to Nonlive
+    runs-on: ubuntu-latest
+    needs: build-and-test
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download Lambda binary
+        uses: actions/download-artifact@v4
+        with:
+          name: lambda-bootstrap
+          path: cmd/lambda
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_PIPELINE_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION || 'eu-west-3' }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ~1.0
+
+      - name: Create backend config
+        working-directory: ./terraform/resources
+        run: |
+          cat > backend.hcl << EOF
+          bucket         = "${{ vars.TF_STATE_BUCKET }}"
+          key            = "resources/nonlive/terraform.tfstate"
+          region         = "${{ vars.AWS_REGION || 'eu-west-3' }}"
+          dynamodb_table = "${{ vars.TF_LOCK_TABLE }}"
+          encrypt        = true
+          EOF
+
+      - name: Terraform Init
+        working-directory: ./terraform/resources
+        run: terraform init -backend-config=backend.hcl
+
+      - name: Terraform Validate
+        working-directory: ./terraform/resources
+        run: terraform validate
+
+      - name: Terraform Plan
+        working-directory: ./terraform/resources
+        run: terraform plan -var="environment=nonlive" -no-color
+
+      - name: Terraform Apply
+        working-directory: ./terraform/resources
+        run: terraform apply -var="environment=nonlive" -auto-approve
+
+  deploy-live:
+    name: Deploy to Live (Production)
+    runs-on: ubuntu-latest
+    needs: deploy-nonlive
+    environment: production
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download Lambda binary
+        uses: actions/download-artifact@v4
+        with:
+          name: lambda-bootstrap
+          path: cmd/lambda
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_PIPELINE_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION || 'eu-west-3' }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ~1.0
+
+      - name: Create backend config
+        working-directory: ./terraform/resources
+        run: |
+          cat > backend.hcl << EOF
+          bucket         = "${{ vars.TF_STATE_BUCKET }}"
+          key            = "resources/live/terraform.tfstate"
+          region         = "${{ vars.AWS_REGION || 'eu-west-3' }}"
+          dynamodb_table = "${{ vars.TF_LOCK_TABLE }}"
+          encrypt        = true
+          EOF
+
+      - name: Terraform Init
+        working-directory: ./terraform/resources
+        run: terraform init -backend-config=backend.hcl
+
+      - name: Terraform Validate
+        working-directory: ./terraform/resources
+        run: terraform validate
+
+      - name: Terraform Plan
+        working-directory: ./terraform/resources
+        run: terraform plan -var="environment=live" -no-color
+
+      - name: Terraform Apply
+        working-directory: ./terraform/resources
+        run: terraform apply -var="environment=live" -auto-approve
+
+  create-release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: deploy-live
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download Lambda binary
+        uses: actions/download-artifact@v4
+        with:
+          name: lambda-bootstrap
+          path: cmd/lambda
 
       - name: Create ZIP package
         run: |
@@ -82,6 +220,10 @@ jobs:
             - Commit: ${{ github.sha }}
             - Branch: ${{ github.ref_name }}
             - Go Version: 1.24
+            
+            ### Deployment
+            - Environment: Live (Production)
+            - Lambda Function: bball-app-template-live
             
             ### Artifacts
             - `bball-app-lambda.zip` - Lambda deployment package

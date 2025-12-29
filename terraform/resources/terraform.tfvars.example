@@ -1,0 +1,19 @@
+# AWS Configuration
+aws_region = "eu-west-3"
+
+# Function Configuration
+function_name = "bball-app-template"
+environment   = "nonlive" # or "live"
+
+# Lambda Settings
+timeout     = 30
+memory_size = 128
+
+# Logging
+log_retention_days = 7
+
+# Tags
+tags = {
+  Project   = "bball-app"
+  ManagedBy = "terraform"
+}
