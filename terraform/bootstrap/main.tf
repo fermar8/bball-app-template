@@ -205,14 +205,29 @@ resource "aws_iam_policy" "iam_management" {
           "iam:GetPolicyVersion",
           "iam:ListPolicyVersions",
           "iam:CreatePolicyVersion",
-          "iam:DeletePolicyVersion",
+          "iam:DeletePolicyVersion"
+        ]
+        Resource = [
+          "arn:aws:iam::*:policy/bball-app-template-*"
+        ]
+      },
+      {
+        Sid    = "IAMPolicyAttachment"
+        Effect = "Allow"
+        Action = [
           "iam:AttachRolePolicy",
           "iam:DetachRolePolicy"
         ]
         Resource = [
-          "arn:aws:iam::*:policy/bball-app-template-*",
-          "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+          "arn:aws:iam::*:role/bball-app-template-*"
         ]
+        Condition = {
+          StringEquals = {
+            "iam:PolicyARN" = [
+              "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+            ]
+          }
+        }
       }
     ]
   })
