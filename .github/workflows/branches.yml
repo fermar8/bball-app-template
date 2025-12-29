@@ -1,0 +1,76 @@
+name: Branch CI - Build, Test, and Plan
+
+on:
+  push:
+    branches-ignore:
+      - main
+  pull_request:
+    branches-ignore:
+      - main
+
+jobs:
+  build-test-deploy:
+    name: Build, Test, and Plan to Nonlive
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+          cache: true
+
+      - name: Get dependencies
+        run: go mod download
+
+      - name: Run tests
+        run: go test ./... -v -race -coverprofile=coverage.out
+
+      - name: Display test coverage
+        run: go tool cover -func=coverage.out
+
+      - name: Build Lambda binary
+        run: |
+          cd cmd/lambda
+          GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o bootstrap main.go
+          ls -lh bootstrap
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_PIPELINE_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION || 'eu-west-3' }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ~1.0
+
+      - name: Create backend config
+        working-directory: ./terraform/resources
+        run: |
+          cat > backend.hcl << EOF
+          bucket         = "${{ vars.TF_STATE_BUCKET }}"
+          key            = "resources/nonlive/terraform.tfstate"
+          region         = "${{ vars.AWS_REGION || 'eu-west-3' }}"
+          dynamodb_table = "${{ vars.TF_LOCK_TABLE }}"
+          encrypt        = true
+          EOF
+
+      - name: Terraform Init
+        working-directory: ./terraform/resources
+        run: terraform init -backend-config=backend.hcl
+
+      - name: Terraform Validate
+        working-directory: ./terraform/resources
+        run: terraform validate
+
+      - name: Terraform Plan
+        working-directory: ./terraform/resources
+        run: terraform plan -var="environment=nonlive" -no-color
