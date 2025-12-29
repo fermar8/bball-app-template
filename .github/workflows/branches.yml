@@ -1,4 +1,4 @@
-name: Branch CI - Build, Test, and Deploy
+name: Branch CI - Build, Test, and Plan
 
 on:
   push:
@@ -10,7 +10,7 @@ on:
 
 jobs:
   build-test-deploy:
-    name: Build, Test, and Deploy to Nonlive
+    name: Build, Test, and Plan to Nonlive
     runs-on: ubuntu-latest
     permissions:
       id-token: write

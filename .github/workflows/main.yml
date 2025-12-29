@@ -1,10 +1,10 @@
 name: Main CI - Build, Test, Deploy, and Release
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - main
-  workflow_dispatch:
 
 jobs:
   build-and-test:
