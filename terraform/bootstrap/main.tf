@@ -145,13 +145,19 @@ resource "aws_iam_policy" "lambda_management" {
           "lambda:UpdateFunctionCode",
           "lambda:UpdateFunctionConfiguration",
           "lambda:ListFunctions",
+          "lambda:ListVersionsByFunction",
           "lambda:ListTags",
           "lambda:TagResource",
           "lambda:UntagResource",
           "lambda:PublishVersion",
           "lambda:GetPolicy",
           "lambda:AddPermission",
-          "lambda:RemovePermission"
+          "lambda:RemovePermission",
+          "lambda:GetAlias",
+          "lambda:ListAliases",
+          "lambda:GetFunctionCodeSigningConfig",
+          "lambda:GetFunctionEventInvokeConfig",
+          "lambda:ListFunctionEventInvokeConfigs"
         ]
         Resource = [
           "arn:aws:lambda:${var.aws_region}:*:function:bball-app-template-*"
@@ -185,6 +191,7 @@ resource "aws_iam_policy" "iam_management" {
           "iam:ListRolePolicies",
           "iam:ListAttachedRolePolicies",
           "iam:ListInstanceProfilesForRole",
+          "iam:ListRoleTags",
           "iam:PassRole",
           "iam:TagRole",
           "iam:UntagRole",
