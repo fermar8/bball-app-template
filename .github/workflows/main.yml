@@ -79,7 +79,7 @@ jobs:
         run: |
           cat > backend.hcl << EOF
           bucket         = "${{ vars.TF_STATE_BUCKET }}"
-          key            = "resources/nonlive/terraform.tfstate"
+          key            = "resources/nonlive/bball-app-template.tfstate"
           region         = "${{ vars.AWS_REGION || 'eu-west-3' }}"
           dynamodb_table = "${{ vars.TF_LOCK_TABLE }}"
           encrypt        = true
@@ -136,7 +136,7 @@ jobs:
         run: |
           cat > backend.hcl << EOF
           bucket         = "${{ vars.TF_STATE_BUCKET }}"
-          key            = "resources/live/terraform.tfstate"
+          key            = "resources/live/bball-app-template.tfstate"
           region         = "${{ vars.AWS_REGION || 'eu-west-3' }}"
           dynamodb_table = "${{ vars.TF_LOCK_TABLE }}"
           encrypt        = true
