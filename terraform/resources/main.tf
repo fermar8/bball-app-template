@@ -20,7 +20,7 @@ provider "aws" {
 # Create ZIP archive for Lambda
 data "archive_file" "lambda_zip" {
   type        = "zip"
-  source_file = "${path.module}/../../cmd/lambda/bootstrap"
+  source_dir  = "${path.module}/../../src"
   output_path = "${path.module}/lambda.zip"
 }
 
@@ -73,9 +73,9 @@ resource "aws_lambda_function" "function" {
   filename         = data.archive_file.lambda_zip.output_path
   function_name    = "${var.function_name}-${var.environment}"
   role            = aws_iam_role.lambda_role.arn
-  handler         = "bootstrap"
+  handler         = "handler.lambda_handler"
   source_code_hash = data.archive_file.lambda_zip.output_base64sha256
-  runtime         = "provided.al2023"
+  runtime         = "python3.12"
   timeout         = var.timeout
   memory_size     = var.memory_size
 
