@@ -6,15 +6,24 @@ A Python-based AWS Lambda function template for the basketball app.
 
 ```
 ├── src/
-│   └── handler.py          # Lambda function handler
+│   ├── messaging/          # Handler and Lambda entry point
+│   ├── service/            # Business logic layer
+│   ├── repository/         # Data access layer
+│   ├── model/              # Data models
+│   └── database/           # Database connection management
 ├── tests/
-│   └── test_handler.py     # Unit tests
+│   ├── unit/               # Unit tests (fast, mocked)
+│   └── integration/        # Integration tests (require database)
+├── scripts/
+│   ├── run_integration_tests.bat  # Windows integration test runner
+│   └── run_integration_tests.sh   # Linux/WSL integration test runner
 ├── terraform/
 │   ├── bootstrap/          # Infrastructure setup
-│   ├── resources/          # Lambda deployment
-│   └── roles/              # (deprecated)
+│   └── resources/          # Lambda and RDS deployment
 ├── .github/
 │   └── workflows/          # CI/CD pipelines
+├── docker-compose.yml      # Local PostgreSQL for testing
+├── pyproject.toml          # Python project configuration and test scripts
 ├── requirements.txt        # Production dependencies
 └── requirements-dev.txt    # Development dependencies
 ```
@@ -32,22 +41,57 @@ A Python-based AWS Lambda function template for the basketball app.
 ```bash
 # Create virtual environment
 python -m venv venv
-venv\Scripts\activate.bat  # On Windows (PowerShell has execution policy restrictions)
+venv\Scripts\activate  # On Windows
 
 # Install dependencies
-python -m pip install -r requirements.txt
-python -m pip install -r requirements-dev.txt
+pip install -r requirements.txt
+pip install -r requirements-dev.txt
 ```
 
 ### Running Tests
 
 ```bash
-# Run all tests with coverage
-python -m pytest tests/ -v --cov=src --cov-report=term-missing
+# Run unit tests (fast, works on all platforms)
+poe test
 
-# Run specific test
-python -m pytest tests/test_handler.py::TestHandler::test_lambda_handler_success -v
+# Run unit tests with coverage report
+poe test-cov
+
+# Run all tests (requires database - see below)
+poe test-all
 ```
+
+#### Integration Tests
+
+Integration tests require a PostgreSQL database.
+
+**✅ In CI/CD (GitHub Actions):**
+- Automatically runs on Ubuntu with PostgreSQL service
+- No setup needed - works out of the box
+
+**⚠️ Locally on Windows:**
+Due to a known issue with psycopg3 + Windows + Spanish locale PostgreSQL error messages, integration tests cannot run directly on Windows. 
+
+**Options for local integration testing:**
+
+1. **Use WSL2 (Recommended)**:
+   ```bash
+   # In WSL2
+   ./scripts/run_integration_tests.sh
+   ```
+
+2. **Skip locally, run in CI/CD**:
+   ```powershell
+   # Just run unit tests locally
+   poe test
+   
+   # Push to GitHub - integration tests run automatically
+   git push
+   ```
+
+3. **Docker + WSL**:
+   - Install WSL2 and Docker Desktop
+   - Run integration tests in Linux environment
 
 ### Local Testing
 
@@ -93,11 +137,44 @@ terraform apply -var="environment=live"
 ## Lambda Configuration
 
 - **Runtime**: Python 3.12
-- **Handler**: `handler.lambda_handler`
+- **Handler**: `messaging.handler.lambda_handler`
 - **Memory**: 128 MB (configurable)
 - **Timeout**: 30 seconds (configurable)
+- **Architecture**: Layered (Messaging → Service → Repository → Database)
+- **Database**: PostgreSQL (AWS RDS)
 - **Environment Variables**:
   - `ENVIRONMENT`: `live` or `nonlive`
+  - `DB_HOST`: RDS endpoint
+  - `DB_PORT`: `5432`
+  - `DB_NAME`: Database name
+  -psycopg[binary,pool]>=3.1.0
+   boto3==1.34.162
+   ```
+
+2. Install locally:
+   ```powershell
+   pip install -r requirements.txt
+   ```
+
+3. Lambda will automatically package dependencies on deployment
+
+## Available Commands (via poethepoet)
+
+```bash
+poe test                    # Run unit tests
+poe test-unit              # Run unit tests (verbose)
+poe test-integration       # Run integration tests (requires PostgreSQL)
+poe test-all               # Run all tests
+poe test-cov               # Run tests with HTML coverage report
+```
+- Unit tests use mocks (no database needed)
+- Integration tests use Docker PostgreSQL (see above)
+
+**Production:**
+- AWS RDS PostgreSQL 15.5
+- Deployed in private subnets
+- Credentials stored in AWS Secrets Manager
+- Connection pooling for performance
 
 ## Adding Dependencies
 
