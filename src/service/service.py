@@ -1,155 +1,100 @@
 """
-Service layer for business logic
+Service layer with business logic.
 """
-import logging
-from typing import List, Optional
+from typing import Optional, List
 
+from src.repository.repository import Repository
 from src.model.models import Entry
-from src.repository import Repository
-
-logger = logging.getLogger(__name__)
 
 
 class Service:
-    """Service for test entry business logic"""
+    """Business logic layer for Entry operations."""
     
-    def __init__(self, repository: Repository = None):
+    def __init__(self, repository: Repository):
+        """Initialize service with repository."""
+        self.repository = repository
+    
+    def create_test_entry(self, name: str, value: int) -> Entry:
         """
-        Initialize the service
+        Create a new test entry with validation.
         
         Args:
-            repository: TestRepository instance (for dependency injection)
-        """
-        self.repository = repository or Repository()
-    
-    def create_test_entry(self, name: str, description: str = "", value: int = 0) -> Entry:
-        """
-        Create a new test entry with validation
-        
-        Args:
-            name: Entry name (required)
-            description: Entry description (optional)
-            value: Entry value (default: 0)
+            name: Name of the entry (must not be empty)
+            value: Value of the entry (must be non-negative)
             
         Returns:
-            Created Entry
+            Created Entry object
             
         Raises:
             ValueError: If validation fails
         """
-        # Validate inputs
+        # Validation
         if not name or not name.strip():
-            raise ValueError("Name is required and cannot be empty")
-        
-        if len(name) > 255:
-            raise ValueError("Name cannot exceed 255 characters")
+            raise ValueError("Name cannot be empty")
         
         if value < 0:
-            raise ValueError("Value cannot be negative")
+            raise ValueError("Value must be non-negative")
         
         # Create entry
-        entry = Entry(
-            name=name.strip(),
-            description=description.strip() if description else "",
-            value=value
-        )
-        
-        logger.info(f"Creating test entry: {name}")
-        created_entry = self.repository.create(entry)
-        logger.info(f"Successfully created test entry with id: {created_entry.id}")
-        
-        return created_entry
+        entry = Entry(name=name.strip(), value=value)
+        return self.repository.create(entry)
     
-    def get_test_entry(self, entry_id: int) -> Optional[Entry]:
+    def get_test_entry(self, entry_id: str) -> Optional[Entry]:
         """
-        Get a test entry by id
+        Get a test entry by ID.
         
         Args:
-            entry_id: The id of the entry to retrieve
+            entry_id: ID of the entry
             
         Returns:
-            Entry or None if not found
+            Entry object if found, None otherwise
         """
-        if entry_id <= 0:
-            raise ValueError("Entry ID must be positive")
-        
         return self.repository.get_by_id(entry_id)
     
-    def list_test_entries(self, limit: int = 100) -> List[Entry]:
+    def list_test_entries(self) -> List[Entry]:
         """
-        List all entries
+        List all test entries.
+        
+        Returns:
+            List of all Entry objects
+        """
+        return self.repository.get_all()
+    
+    def update_test_entry(self, entry_id: str, name: Optional[str] = None, 
+                         value: Optional[int] = None) -> Optional[Entry]:
+        """
+        Update a test entry with validation.
         
         Args:
-            limit: Maximum number of entries to return
+            entry_id: ID of the entry to update
+            name: New name (optional, must not be empty if provided)
+            value: New value (optional, must be non-negative if provided)
             
         Returns:
-            List of Entry objects
-        """
-        if limit <= 0 or limit > 1000:
-            raise ValueError("Limit must be between 1 and 1000")
-        
-        return self.repository.get_all(limit)
-    
-    def update_test_entry(
-        self,
-        entry_id: int,
-        name: Optional[str] = None,
-        description: Optional[str] = None,
-        value: Optional[int] = None
-    ) -> Optional[Entry]:
-        """
-        Update an existing test entry
-        
-        Args:
-            entry_id: The id of the entry to update
-            name: New name (optional)
-            description: New description (optional)
-            value: New value (optional)
+            Updated Entry object if found, None otherwise
             
-        Returns:
-            Updated Entry or None if not found
+        Raises:
+            ValueError: If validation fails
         """
-        # Get existing entry
-        existing_entry = self.repository.get_by_id(entry_id)
-        if not existing_entry:
-            return None
+        # Validation
+        if name is not None and (not name or not name.strip()):
+            raise ValueError("Name cannot be empty")
         
-        # Update fields if provided
-        if name is not None:
-            if not name.strip():
-                raise ValueError("Name cannot be empty")
-            if len(name) > 255:
-                raise ValueError("Name cannot exceed 255 characters")
-            existing_entry.name = name.strip()
+        if value is not None and value < 0:
+            raise ValueError("Value must be non-negative")
         
-        if description is not None:
-            existing_entry.description = description.strip()
-        
-        if value is not None:
-            if value < 0:
-                raise ValueError("Value cannot be negative")
-            existing_entry.value = value
-        
-        logger.info(f"Updating test entry with id: {entry_id}")
-        return self.repository.update(existing_entry)
+        # Update entry
+        name_to_update = name.strip() if name else None
+        return self.repository.update(entry_id, name=name_to_update, value=value)
     
-    def delete_test_entry(self, entry_id: int) -> bool:
+    def delete_test_entry(self, entry_id: str) -> bool:
         """
-        Delete a test entry
+        Delete a test entry.
         
         Args:
-            entry_id: The id of the entry to delete
+            entry_id: ID of the entry to delete
             
         Returns:
             True if deleted, False if not found
         """
-        if entry_id <= 0:
-            raise ValueError("Entry ID must be positive")
-        
-        logger.info(f"Deleting test entry with id: {entry_id}")
         return self.repository.delete(entry_id)
-    
-    def initialize_database(self):
-        """Initialize database schema"""
-        logger.info("Initializing database schema")
-        self.repository.create_table_if_not_exists()

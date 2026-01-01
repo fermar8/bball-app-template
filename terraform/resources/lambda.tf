@@ -60,21 +60,10 @@ resource "aws_lambda_function" "function" {
   timeout         = var.timeout
   memory_size     = var.memory_size
 
-  vpc_config {
-    subnet_ids         = aws_subnet.private_lambda[*].id
-    security_group_ids = [aws_security_group.lambda.id]
-  }
-
   environment {
     variables = {
       ENVIRONMENT        = var.environment
-      DB_SECRET_ARN      = aws_secretsmanager_secret.db_password.arn
-      DB_HOST            = aws_db_instance.main.address
-      DB_PORT            = "5432"
-      DB_NAME            = var.db_name
-      DB_USER            = var.db_username
-      DB_MIN_CONNECTIONS = "1"
-      DB_MAX_CONNECTIONS = "5"
+      DYNAMODB_TABLE_NAME = var.environment == "live" ? data.terraform_remote_state.bootstrap.outputs.dynamodb_table_live_name : data.terraform_remote_state.bootstrap.outputs.dynamodb_table_nonlive_name
     }
   }
 
@@ -88,7 +77,46 @@ resource "aws_lambda_function" "function" {
   depends_on = [
     aws_cloudwatch_log_group.lambda_logs,
     aws_iam_role_policy_attachment.lambda_basic,
-    aws_iam_role_policy_attachment.lambda_vpc,
-    aws_db_instance.main
+    aws_iam_role_policy_attachment.lambda_dynamodb
   ]
+}
+
+# IAM Policy for Lambda to access DynamoDB
+resource "aws_iam_policy" "lambda_dynamodb" {
+  name        = "${var.function_name}-${var.environment}-lambda-dynamodb-policy"
+  description = "Allow Lambda to access DynamoDB table"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "dynamodb:GetItem",
+          "dynamodb:PutItem",
+          "dynamodb:UpdateItem",
+          "dynamodb:DeleteItem",
+          "dynamodb:Query",
+          "dynamodb:Scan"
+        ]
+        Resource = [
+          var.environment == "live" ? data.terraform_remote_state.bootstrap.outputs.dynamodb_table_live_arn : data.terraform_remote_state.bootstrap.outputs.dynamodb_table_nonlive_arn,
+          "${var.environment == "live" ? data.terraform_remote_state.bootstrap.outputs.dynamodb_table_live_arn : data.terraform_remote_state.bootstrap.outputs.dynamodb_table_nonlive_arn}/index/*"
+        ]
+      }
+    ]
+  })
+
+  tags = merge(
+    var.tags,
+    {
+      Environment = var.environment
+    }
+  )
+}
+
+# Attach DynamoDB policy to Lambda role
+resource "aws_iam_role_policy_attachment" "lambda_dynamodb" {
+  role       = aws_iam_role.lambda_role.name
+  policy_arn = aws_iam_policy.lambda_dynamodb.arn
 }

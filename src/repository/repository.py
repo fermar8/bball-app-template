@@ -1,223 +1,171 @@
 """
-Repository layer for database operations
+Repository layer for DynamoDB operations.
 """
-import logging
-from typing import List, Optional
-from psycopg.rows import dict_row
+import uuid
+from typing import Optional, List
+from datetime import datetime, timezone
+from decimal import Decimal
 
-from src.database.database import get_db_connection
+from src.database.database import DynamoDBConnection
 from src.model.models import Entry
-
-logger = logging.getLogger(__name__)
+from boto3.dynamodb.conditions import Key
 
 
 class Repository:
-    """Repository for test table operations"""
+    """Data access layer for Entry model using DynamoDB."""
     
-    @staticmethod
-    def create_table_if_not_exists():
-        """Create the test table if it doesn't exist"""
-        create_table_sql = """
-        CREATE TABLE IF NOT EXISTS test (
-            id SERIAL PRIMARY KEY,
-            name VARCHAR(255) NOT NULL,
-            description TEXT,
-            value INTEGER NOT NULL DEFAULT 0,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        );
-        
-        CREATE INDEX IF NOT EXISTS idx_test_name ON test(name);
-        """
-        
-        try:
-            with get_db_connection() as conn:
-                with conn.cursor() as cursor:
-                    cursor.execute(create_table_sql)
-                    conn.commit()
-                    logger.info("Test table created or already exists")
-        except Exception as e:
-            logger.error(f"Error creating test table: {e}")
-            raise
+    def __init__(self):
+        """Initialize repository with DynamoDB table."""
+        self.table = DynamoDBConnection.get_table()
     
-    @staticmethod
-    def create(entry: Entry) -> Entry:
+    def create(self, entry: Entry) -> Entry:
         """
-        Create a new test entry
+        Create a new entry in DynamoDB.
         
         Args:
             entry: Entry object to create
             
         Returns:
-            Entry: Created entry with id and timestamps
+            Created Entry object with generated ID and timestamps
         """
-        insert_sql = """
-        INSERT INTO test (name, description, value)
-        VALUES (%s, %s, %s)
-        RETURNING id, name, description, value, created_at, updated_at
-        """
+        # Generate ID if not provided
+        if not entry.id:
+            entry.id = str(uuid.uuid4())
         
-        try:
-            with get_db_connection() as conn:
-                with conn.cursor() as cursor:
-                    cursor.execute(insert_sql, (entry.name, entry.description, entry.value))
-                    result = cursor.fetchone()
-                    conn.commit()
-                    
-                    created_entry = Entry(
-                        id=result['id'],
-                        name=result['name'],
-                        description=result['description'],
-                        value=result['value'],
-                        created_at=result['created_at'],
-                        updated_at=result['updated_at']
-                    )
-                    
-                    logger.info(f"Created test entry with id: {created_entry.id}")
-                    return created_entry
-        except Exception as e:
-            logger.error(f"Error creating test entry: {e}")
-            raise
+        # Set timestamps
+        now = datetime.now(timezone.utc).isoformat()
+        if not entry.created_at:
+            entry.created_at = now
+        entry.updated_at = now
+        
+        # Convert to DynamoDB format
+        item = {
+            'id': entry.id,
+            'name': entry.name,
+            'value': Decimal(str(entry.value)),  # DynamoDB requires Decimal for numbers
+            'created_at': entry.created_at,
+            'updated_at': entry.updated_at
+        }
+        
+        # Put item in DynamoDB
+        self.table.put_item(Item=item)
+        
+        return entry
     
-    @staticmethod
-    def get_by_id(entry_id: int) -> Optional[Entry]:
+    def get_by_id(self, entry_id: str) -> Optional[Entry]:
         """
-        Get a test entry by id
+        Get an entry by ID.
         
         Args:
-            entry_id: The id of the entry to retrieve
+            entry_id: ID of the entry to retrieve
             
         Returns:
-            Entry or None if not found
+            Entry object if found, None otherwise
         """
-        select_sql = """
-        SELECT id, name, description, value, created_at, updated_at
-        FROM test
-        WHERE id = %s
-        """
+        response = self.table.get_item(Key={'id': entry_id})
         
-        try:
-            with get_db_connection() as conn:
-                with conn.cursor() as cursor:
-                    cursor.execute(select_sql, (entry_id,))
-                    result = cursor.fetchone()
-                    
-                    if result:
-                        return Entry(
-                            id=result['id'],
-                            name=result['name'],
-                            description=result['description'],
-                            value=result['value'],
-                            created_at=result['created_at'],
-                            updated_at=result['updated_at']
-                        )
-                    return None
-        except Exception as e:
-            logger.error(f"Error retrieving test entry: {e}")
-            raise
+        if 'Item' not in response:
+            return None
+        
+        item = response['Item']
+        return Entry(
+            id=item['id'],
+            name=item['name'],
+            value=int(item['value']),  # Convert Decimal back to int
+            created_at=item.get('created_at'),
+            updated_at=item.get('updated_at')
+        )
     
-    @staticmethod
-    def get_all(limit: int = 100) -> List[Entry]:
+    def get_all(self) -> List[Entry]:
         """
-        Get all test entries
+        Get all entries.
+        
+        Returns:
+            List of all Entry objects
+        """
+        response = self.table.scan()
+        items = response.get('Items', [])
+        
+        return [
+            Entry(
+                id=item['id'],
+                name=item['name'],
+                value=int(item['value']),
+                created_at=item.get('created_at'),
+                updated_at=item.get('updated_at')
+            )
+            for item in items
+        ]
+    
+    def update(self, entry_id: str, name: Optional[str] = None, value: Optional[int] = None) -> Optional[Entry]:
+        """
+        Update an entry.
         
         Args:
-            limit: Maximum number of entries to return
+            entry_id: ID of the entry to update
+            name: New name (optional)
+            value: New value (optional)
             
         Returns:
-            List of Entry objects
+            Updated Entry object if found, None otherwise
         """
-        select_sql = """
-        SELECT id, name, description, value, created_at, updated_at
-        FROM test
-        ORDER BY created_at DESC
-        LIMIT %s
-        """
+        # Build update expression
+        update_expr = "SET updated_at = :updated_at"
+        expr_attr_values = {
+            ':updated_at': datetime.now(timezone.utc).isoformat()
+        }
+        
+        if name is not None:
+            update_expr += ", #n = :name"
+            expr_attr_values[':name'] = name
+        
+        if value is not None:
+            update_expr += ", #v = :value"
+            expr_attr_values[':value'] = Decimal(str(value))
+        
+        # Attribute name aliases (reserved keywords)
+        expr_attr_names = {}
+        if name is not None:
+            expr_attr_names['#n'] = 'name'
+        if value is not None:
+            expr_attr_names['#v'] = 'value'
         
         try:
-            with get_db_connection() as conn:
-                with conn.cursor() as cursor:
-                    cursor.execute(select_sql, (limit,))
-                    results = cursor.fetchall()
-                    
-                    return [
-                        Entry(
-                            id=row['id'],
-                            name=row['name'],
-                            description=row['description'],
-                            value=row['value'],
-                            created_at=row['created_at'],
-                            updated_at=row['updated_at']
-                        )
-                        for row in results
-                    ]
-        except Exception as e:
-            logger.error(f"Error retrieving test entries: {e}")
-            raise
-    
-    @staticmethod
-    def update(entry: Entry) -> Optional[Entry]:
-        """
-        Update an existing test entry
-        
-        Args:
-            entry: Entry object with updated values
+            response = self.table.update_item(
+                Key={'id': entry_id},
+                UpdateExpression=update_expr,
+                ExpressionAttributeValues=expr_attr_values,
+                ExpressionAttributeNames=expr_attr_names if expr_attr_names else None,
+                ReturnValues='ALL_NEW'
+            )
             
-        Returns:
-            Updated Entry or None if not found
-        """
-        update_sql = """
-        UPDATE test
-        SET name = %s, description = %s, value = %s, updated_at = CURRENT_TIMESTAMP
-        WHERE id = %s
-        RETURNING id, name, description, value, created_at, updated_at
-        """
-        
-        try:
-            with get_db_connection() as conn:
-                with conn.cursor() as cursor:
-                    cursor.execute(update_sql, (entry.name, entry.description, entry.value, entry.id))
-                    result = cursor.fetchone()
-                    conn.commit()
-                    
-                    if result:
-                        return Entry(
-                            id=result['id'],
-                            name=result['name'],
-                            description=result['description'],
-                            value=result['value'],
-                            created_at=result['created_at'],
-                            updated_at=result['updated_at']
-                        )
-                    return None
-        except Exception as e:
-            logger.error(f"Error updating test entry: {e}")
-            raise
+            item = response['Attributes']
+            return Entry(
+                id=item['id'],
+                name=item['name'],
+                value=int(item['value']),
+                created_at=item.get('created_at'),
+                updated_at=item.get('updated_at')
+            )
+        except self.table.meta.client.exceptions.ResourceNotFoundException:
+            return None
     
-    @staticmethod
-    def delete(entry_id: int) -> bool:
+    def delete(self, entry_id: str) -> bool:
         """
-        Delete a test entry
+        Delete an entry.
         
         Args:
-            entry_id: The id of the entry to delete
+            entry_id: ID of the entry to delete
             
         Returns:
             True if deleted, False if not found
         """
-        delete_sql = "DELETE FROM test WHERE id = %s"
-        
         try:
-            with get_db_connection() as conn:
-                with conn.cursor() as cursor:
-                    cursor.execute(delete_sql, (entry_id,))
-                    deleted_count = cursor.rowcount
-                    conn.commit()
-                    
-                    if deleted_count > 0:
-                        logger.info(f"Deleted test entry with id: {entry_id}")
-                        return True
-                    return False
-        except Exception as e:
-            logger.error(f"Error deleting test entry: {e}")
-            raise
+            response = self.table.delete_item(
+                Key={'id': entry_id},
+                ReturnValues='ALL_OLD'
+            )
+            # Check if Attributes exists and is not empty
+            return 'Attributes' in response and bool(response['Attributes'])
+        except Exception:
+            return False

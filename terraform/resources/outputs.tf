@@ -23,41 +23,13 @@ output "lambda_invoke_arn" {
   value       = aws_lambda_function.function.invoke_arn
 }
 
-# Database outputs
-output "db_endpoint" {
-  description = "RDS PostgreSQL endpoint"
-  value       = aws_db_instance.main.endpoint
+# DynamoDB outputs (from bootstrap)
+output "dynamodb_table_name" {
+  description = "Name of the DynamoDB table used by this Lambda"
+  value       = var.environment == "live" ? data.terraform_remote_state.bootstrap.outputs.dynamodb_table_live_name : data.terraform_remote_state.bootstrap.outputs.dynamodb_table_nonlive_name
 }
 
-output "db_address" {
-  description = "RDS PostgreSQL address"
-  value       = aws_db_instance.main.address
+output "dynamodb_table_arn" {
+  description = "ARN of the DynamoDB table used by this Lambda"
+  value       = var.environment == "live" ? data.terraform_remote_state.bootstrap.outputs.dynamodb_table_live_arn : data.terraform_remote_state.bootstrap.outputs.dynamodb_table_nonlive_arn
 }
-
-output "db_name" {
-  description = "Name of the database"
-  value       = aws_db_instance.main.db_name
-}
-
-output "db_secret_arn" {
-  description = "ARN of the database password secret"
-  value       = aws_secretsmanager_secret.db_password.arn
-  sensitive   = true
-}
-
-# VPC outputs
-output "vpc_id" {
-  description = "ID of the VPC"
-  value       = aws_vpc.main.id
-}
-
-output "lambda_security_group_id" {
-  description = "ID of the Lambda security group"
-  value       = aws_security_group.lambda.id
-}
-
-output "rds_security_group_id" {
-  description = "ID of the RDS security group"
-  value       = aws_security_group.rds.id
-}
-

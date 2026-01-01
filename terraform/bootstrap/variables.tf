@@ -36,3 +36,18 @@ variable "existing_oidc_provider_arn" {
   type        = string
   default     = ""
 }
+
+variable "project_name" {
+  description = "Name of the project (used for resource naming)"
+  type        = string
+  default     = "bball-app"
+}
+
+variable "tags" {
+  description = "Tags to apply to all resources"
+  type        = map(string)
+  default = {
+    Project   = "bball-app"
+    ManagedBy = "terraform"
+  }
+}

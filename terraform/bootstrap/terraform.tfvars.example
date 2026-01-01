@@ -1,0 +1,26 @@
+# AWS Configuration
+aws_region = "eu-west-3"
+
+# S3 State Backend (must be globally unique)
+state_bucket_name = "bball-app-tfstate-ACCOUNT_ID-REGION"  # Replace ACCOUNT_ID with your AWS account ID
+
+# DynamoDB Lock Table
+lock_table_name = "bball-app-terraform-locks"
+
+# GitHub Repository Configuration
+github_org  = "your-github-org"      # Your GitHub organization or username
+github_repo = "your-repo-name"       # Your repository name
+
+# OIDC Provider (set to false if you already have GitHub OIDC provider)
+create_oidc_provider       = true
+existing_oidc_provider_arn = ""      # Only needed if create_oidc_provider = false
+
+# Project Configuration
+project_name = "bball-app"
+
+# Tags
+tags = {
+  Project   = "bball-app"
+  ManagedBy = "terraform"
+  Environment = "shared"
+}
