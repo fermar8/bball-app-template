@@ -95,10 +95,10 @@ class TestRepositoryIntegration:
                     SELECT EXISTS (
                         SELECT FROM information_schema.tables 
                         WHERE table_name = 'test'
-                    )
+                    ) as exists
                 """)
-                exists = cursor.fetchone()[0]
-                assert exists is True
+                result = cursor.fetchone()
+                assert result['exists'] is True
     
     def test_create_entry(self, db_connection):
         """Test creating an entry"""
