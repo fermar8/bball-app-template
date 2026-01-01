@@ -19,7 +19,7 @@ def test_db_config():
     config = DatabaseConfig()
     # Override with explicit ASCII-safe test values
     config.host = 'localhost'
-    config.port = 5433
+    config.port = 5432  # Standard PostgreSQL port (matches GitHub Actions)
     config.user = 'testuser'
     config.password = 'testpassword'
     config.database = 'testdb'
