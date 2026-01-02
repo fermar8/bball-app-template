@@ -22,3 +22,14 @@ output "lambda_invoke_arn" {
   description = "Invoke ARN of the Lambda function"
   value       = aws_lambda_function.function.invoke_arn
 }
+
+# DynamoDB outputs (from local resources)
+output "dynamodb_table_name" {
+  description = "Name of the DynamoDB table used by this Lambda"
+  value       = aws_dynamodb_table.app_table.name
+}
+
+output "dynamodb_table_arn" {
+  description = "ARN of the DynamoDB table used by this Lambda"
+  value       = aws_dynamodb_table.app_table.arn
+}

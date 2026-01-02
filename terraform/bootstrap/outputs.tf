@@ -39,7 +39,7 @@ output "backend_config" {
     terraform {
       backend "s3" {
         bucket         = "${aws_s3_bucket.terraform_state.id}"
-        key            = "${var.github_repo}/terraform.tfstate"
+        key            = "bootstrap/roles-and-db-config.tfstate"
         region         = "${var.aws_region}"
         dynamodb_table = "${aws_dynamodb_table.terraform_locks.id}"
         encrypt        = true

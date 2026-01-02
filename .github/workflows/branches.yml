@@ -32,13 +32,15 @@ jobs:
           pip install -r requirements.txt
           pip install -r requirements-dev.txt
 
-      - name: Run tests
-        run: |
-          python -m pytest tests/ -v --cov=src --cov-report=term-missing
+      - name: Run unit tests
+        run: poe test
+
+      - name: Run integration tests
+        run: poe test-integration
 
       - name: Verify Lambda handler
         run: |
-          python -c "from src.handler import lambda_handler; print('Lambda handler loaded successfully')"
+          python -c "from src.messaging.handler import lambda_handler; print('Lambda handler loaded successfully')"
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4

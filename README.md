@@ -1,175 +1,115 @@
 # Basketball App Template - Python Lambda
 
-A Python-based AWS Lambda function template for the basketball app.
+A serverless Python template project for AWS Lambda with DynamoDB, designed for rapid deployment using GitHub Actions OIDC authentication. This template includes a complete bootstrap infrastructure setup and automated CI/CD pipelines.
 
-## Structure
+## Project Overview
+
+This is a **template project** that demonstrates:
+- **Layered Architecture**: Handler → Service → Repository → Model
+- **DynamoDB Integration**: Serverless NoSQL database with pay-per-request billing
+- **JSON Schema Validation**: Request validation at the handler layer
+- **Infrastructure as Code**: Terraform with separated bootstrap and resources
+- **GitHub Actions OIDC**: Secure deployments without AWS access keys
+
+## Folder Structure
 
 ```
 ├── src/
-│   └── handler.py          # Lambda function handler
+│   ├── messaging/          # Handler and Lambda entry point
+│   │   └── schemas/        # JSON schemas for event validation
+│   ├── service/            # Business logic layer (no validation)
+│   ├── repository/         # Data access layer (DynamoDB operations)
+│   ├── model/              # Data models
+│   └── database/           # DynamoDB connection management
 ├── tests/
-│   └── test_handler.py     # Unit tests
+│   ├── unit/               # Unit tests with mocked dependencies
+│   └── integration/        # Integration tests with moto (DynamoDB mocking)
 ├── terraform/
-│   ├── bootstrap/          # Infrastructure setup
-│   ├── resources/          # Lambda deployment
-│   └── roles/              # (deprecated)
+│   ├── bootstrap/          # One-time infrastructure (roles, S3, OIDC)
+│   └── resources/          # Per-environment resources (Lambda, DynamoDB)
 ├── .github/
 │   └── workflows/          # CI/CD pipelines
-├── requirements.txt        # Production dependencies
-└── requirements-dev.txt    # Development dependencies
+├── requirements.txt        # Production dependencies (boto3, jsonschema)
+├── requirements-dev.txt    # Development dependencies (pytest, moto)
+└── pyproject.toml          # Python project configuration
 ```
 
-## Local Development
+## Running Tests Locally
 
 ### Prerequisites
 
 - Python 3.12+
-- AWS CLI configured
-- Terraform >= 1.0
+- Virtual environment
 
 ### Setup
 
 ```bash
-# Create virtual environment
+# Create and activate virtual environment
 python -m venv venv
-venv\Scripts\activate.bat  # On Windows (PowerShell has execution policy restrictions)
+venv\Scripts\activate  # On Windows
+source venv/bin/activate  # On Linux/Mac
 
 # Install dependencies
-python -m pip install -r requirements.txt
-python -m pip install -r requirements-dev.txt
+pip install -r requirements.txt
+pip install -r requirements-dev.txt
 ```
 
-### Running Tests
+### Run Tests
 
+**Unit Tests** (fast, no external dependencies):
 ```bash
-# Run all tests with coverage
-python -m pytest tests/ -v --cov=src --cov-report=term-missing
+# Run all unit tests
+poe test
 
-# Run specific test
-python -m pytest tests/test_handler.py::TestHandler::test_lambda_handler_success -v
+# Run with coverage report
+poe test-cov
 ```
 
-### Local Testing
+**Integration Tests** (uses moto to mock DynamoDB):
+```bash
+# Run integration tests
+poe test-integration
 
-```python
-from src.handler import lambda_handler
-
-event = {"test": "data"}
-context = {}
-response = lambda_handler(event, context)
-print(response)
+# Run all tests (unit + integration)
+poe test-all
 ```
 
-## Deployment
+**Note**: Integration tests use [moto](https://github.com/getmoto/moto) to mock AWS DynamoDB, so they run locally without AWS credentials or a real database. They work on all platforms (Windows, Linux, Mac).
 
-### Automated (via GitHub Actions)
+### Test Structure
 
-**Branch deployments** (nonlive environment):
-- Push to any branch triggers build, test, and plan
-- Does not deploy automatically
+- **Unit Tests**: Mock all dependencies, test individual components
+  - `test_handler.py` - Tests JSON schema validation and routing
+  - `test_service.py` - Tests business logic (no validation)
+  - `test_models.py` - Tests data models
+  
+- **Integration Tests**: Use moto to mock DynamoDB, test full stack
+  - `test_dynamodb_integration.py` - Tests Repository and Service with mocked DynamoDB
 
-**Main deployments** (nonlive → live):
-1. Push to `main` branch
-2. Deploys to nonlive automatically
-3. Waits for approval
-4. Deploys to live after approval
-5. Creates GitHub release
+## Bootstrap Configuration
 
-### Manual (local)
+This template uses a **two-layer infrastructure approach**:
 
-```powershell
-cd terraform/resources
+1. **Bootstrap** (`terraform/bootstrap/`) - Deploy **once** locally
+   - Creates S3 bucket for Terraform state
+   - Creates DynamoDB table for state locking
+   - Creates GitHub OIDC provider and IAM role
+   - See [terraform/bootstrap/README.md](terraform/bootstrap/README.md)
 
-# Deploy to nonlive
-terraform init -backend-config="backend.hcl"
-terraform plan -var="environment=nonlive"
-terraform apply -var="environment=nonlive"
+2. **Resources** (`terraform/resources/`) - Deploy via **pipeline** per environment
+   - Creates Lambda function
+   - Creates DynamoDB table (per environment)
+   - References bootstrap via remote state
+   - See [terraform/resources/README.md](terraform/resources/README.md)
 
-# Deploy to live
-terraform plan -var="environment=live"
-terraform apply -var="environment=live"
-```
+## CI/CD Deployment
 
-## Lambda Configuration
+The project includes automated GitHub Actions workflows:
 
-- **Runtime**: Python 3.12
-- **Handler**: `handler.lambda_handler`
-- **Memory**: 128 MB (configurable)
-- **Timeout**: 30 seconds (configurable)
-- **Environment Variables**:
-  - `ENVIRONMENT`: `live` or `nonlive`
+- **branches.yml**: Runs on feature branches - builds, tests, and plans (no deployment)
+- **main.yml**: Runs on main branch - deploys to nonlive, then live (with approval)
 
-## Adding Dependencies
-
-1. Add to `requirements.txt`:
-   ```
-   boto3==1.34.0
-   requests==2.31.0
-   ```
-
-2. Install locally:
-   ```powershell
-   python -m pip install -r requirements.txt
-   ```
-
-3. Lambda will automatically package dependencies on deployment
-
-## Testing the Deployed Function
-
-```powershell
-# Invoke the function
-aws lambda invoke `
-  --function-name bball-app-template-nonlive `
-  --payload '{"test": "data"}' `
-  response.json
-
-# View response
-Get-Content response.json
-
-# View logs
-aws logs tail /aws/lambda/bball-app-template-nonlive --follow
-```
-
-## CI/CD Workflows
-
-### branches.yml
-- Triggers on push to any branch (except main)
-- Runs tests and terraform plan
-- Does not deploy
-
-### main.yml
-- Triggers on push to main
-- Deploys to nonlive automatically
-- Requires approval for live deployment
-- Creates GitHub release with artifacts
-
-## Infrastructure
-
-### Bootstrap (one-time setup)
-```powershell
-cd terraform/bootstrap
-terraform init
-terraform apply
-```
-
-Creates:
-- S3 bucket for state
-- DynamoDB table for locking
-- IAM role for GitHub Actions
-- OIDC provider
-
-### Resources (Lambda functions)
-Managed via workflows or locally:
-- `bball-app-template-nonlive`
-- `bball-app-template-live`
-
-## Environment Configuration
-
-Set these GitHub repository variables:
-- `AWS_PIPELINE_ROLE_ARN`: Pipeline IAM role ARN
-- `AWS_REGION`: AWS region (default: eu-west-3)
-- `TF_STATE_BUCKET`: S3 state bucket name
-- `TF_LOCK_TABLE`: DynamoDB lock table name
+All tests run automatically in the pipeline with no database setup required (moto handles DynamoDB mocking).
 
 ## License
 

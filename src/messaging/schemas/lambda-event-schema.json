@@ -1,0 +1,165 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Lambda Event Schema",
+  "description": "Schema for all possible events that the Lambda function can receive",
+  "type": "object",
+  "required": ["action"],
+  "properties": {
+    "action": {
+      "type": "string",
+      "enum": ["create", "get", "list", "update", "delete"],
+      "description": "The action to perform"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "action": { "const": "create" } }
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "type": "object",
+            "required": ["name", "value"],
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Name of the entry (cannot be empty or whitespace-only)"
+              },
+              "value": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Value of the entry (must be non-negative)"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "required": ["data"]
+      }
+    },
+    {
+      "if": {
+        "properties": { "action": { "const": "get" } }
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "type": "object",
+            "required": ["id"],
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "UUID of the entry to retrieve"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "required": ["data"]
+      }
+    },
+    {
+      "if": {
+        "properties": { "action": { "const": "list" } }
+      },
+      "then": {
+        "not": {
+          "required": ["data"]
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "action": { "const": "update" } }
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "type": "object",
+            "required": ["id"],
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "UUID of the entry to update"
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "description": "New name for the entry (optional)"
+              },
+              "value": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "New value for the entry (optional)"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "required": ["data"]
+      }
+    },
+    {
+      "if": {
+        "properties": { "action": { "const": "delete" } }
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "type": "object",
+            "required": ["id"],
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "UUID of the entry to delete"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "required": ["data"]
+      }
+    }
+  ],
+  "examples": [
+    {
+      "action": "create",
+      "data": {
+        "name": "Test Entry",
+        "value": 42
+      }
+    },
+    {
+      "action": "get",
+      "data": {
+        "id": "550e8400-e29b-41d4-a716-446655440000"
+      }
+    },
+    {
+      "action": "list"
+    },
+    {
+      "action": "update",
+      "data": {
+        "id": "550e8400-e29b-41d4-a716-446655440000",
+        "name": "Updated Name",
+        "value": 100
+      }
+    },
+    {
+      "action": "update",
+      "data": {
+        "id": "550e8400-e29b-41d4-a716-446655440000",
+        "name": "Only Name Updated"
+      }
+    },
+    {
+      "action": "delete",
+      "data": {
+        "id": "550e8400-e29b-41d4-a716-446655440000"
+      }
+    }
+  ]
+}

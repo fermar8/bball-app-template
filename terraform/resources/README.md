@@ -1,158 +1,316 @@
-# Basketball App Lambda Resources
+# Terraform Resources
 
-This Terraform configuration deploys the bball-app Lambda function to AWS.
+This directory contains **per-project Lambda infrastructure** that gets deployed automatically via GitHub Actions pipeline.
 
-## Resources Created
+## 📦 What Gets Deployed
 
-- **Lambda Function**: `bball-app-template-{environment}`
-- **IAM Role**: Execution role for the Lambda function
-- **CloudWatch Log Group**: For Lambda logs with configurable retention
-- **Lambda Package**: Automatically built from Go source code
+- **Lambda Function**: Your application code => two are created, as per environment (nonlive/live)
+- **DynamoDB Table**: Created per environment (nonlive/live)
+- **IAM Role**: Lambda execution permissions
+- **CloudWatch Logs**: Function logging
 
-## Environments
+---
 
-The function name is automatically suffixed based on the environment:
-- `bball-app-template-nonlive` (for testing/development)
-- `bball-app-template-live` (for production)
+## ⚙️ How It Works
 
-## Prerequisites
+The pipeline deploys these resources and **automatically references bootstrap infrastructure**:
 
-- Terraform >= 1.0
-- Go 1.24+ installed
-- AWS credentials configured
-- AWS CLI (optional, for testing)
-
-## Deployment
-
-### 1. Configure Variables
-
-Copy the example tfvars file:
-
-```bash
-cp terraform.tfvars.example terraform.tfvars
+```
+┌─────────────────────────────────────┐
+│  GitHub Actions Pipeline            │
+│  (Triggered on push)                │
+└──────────────┬──────────────────────┘
+               │
+               ├─ Uses IAM role from bootstrap
+               ├─ Reads bootstrap state from S3
+               │
+               ↓
+┌─────────────────────────────────────┐
+│  Resources (this directory)         │
+│  ┌───────────────────────────────┐  │
+│  │ Lambda Function               │  │
+│  │ DynamoDB Table (per env)      │  │
+│  │ IAM Role & Policies           │  │
+│  └───────────────────────────────┘  │
+└─────────────────────────────────────┘
+               │
+               │ References via remote state
+               ↓
+┌─────────────────────────────────────┐
+│  Bootstrap (deployed once)          │
+│  - S3 state bucket                  │
+│  - DynamoDB state lock              │
+│  - GitHub Actions IAM role          │
+│  - OIDC provider                    │
+└─────────────────────────────────────┘
 ```
 
-Edit `terraform.tfvars` and set the `environment` variable:
+---
+
+## 🔗 Referencing Bootstrap Resources
+
+### 1. Backend Configuration
+
+The `backend.tf` file tells Terraform where to store state:
 
 ```hcl
-environment = "nonlive"  # or "live"
+terraform {
+  backend "s3" {
+    bucket         = "tfstate-590183661886-eu-west-3"
+    key            = "resources/nonlive/bball-app-template.tfstate"
+    region         = "eu-west-3"
+    dynamodb_table = "terraform-state-lock"
+    encrypt        = true
+  }
+}
 ```
 
-### 2. Deploy
+**Key points:**
+- `bucket` - The S3 bucket created by bootstrap
+- `key` - Unique path per environment: `resources/{env}/{project}.tfstate`
+- `dynamodb_table` - Lock table created by bootstrap
+
+### 2. Data Source Configuration
+
+The `data.tf` file reads bootstrap outputs:
+
+```hcl
+data "terraform_remote_state" "bootstrap" {
+  backend = "s3"
+  
+  config = {
+    bucket = var.bootstrap_state_bucket
+    key    = "bootstrap/roles-and-db-config.tfstate"  # Must match bootstrap backend.tf
+    region = var.aws_region
+  }
+}
+```
+
+**What this does:**
+- Reads bootstrap Terraform state from S3
+- Makes bootstrap outputs available: `data.terraform_remote_state.bootstrap.outputs.pipeline_role_arn`
+- No hardcoded ARNs needed - everything is dynamic
+
+### 3. Using Bootstrap Outputs
+
+In `lambda.tf`, resources reference bootstrap:
+
+```hcl
+# Example: Using bootstrap outputs (if you had them)
+resource "aws_lambda_function" "function" {
+  # Your Lambda configuration
+  
+  environment {
+    variables = {
+      DYNAMODB_TABLE_NAME = aws_dynamodb_table.app_table.name
+      # Could reference bootstrap outputs here if needed:
+      # SHARED_RESOURCE = data.terraform_remote_state.bootstrap.outputs.some_value
+    }
+  }
+}
+```
+
+**Current setup:**
+- DynamoDB tables are created **in resources** (per environment)
+- Lambda gets table name from the locally-created table
+- Bootstrap provides: state bucket, lock table, IAM role for pipeline
+
+---
+
+## 🚀 Deployment Process
+
+### Automatic (via Pipeline)
+
+**Push to GitHub** → Pipeline runs automatically:
 
 ```bash
-# Initialize Terraform
-terraform init
+git add .
+git commit -m "Update Lambda code"
+git push origin main  # or develop
+```
 
-# Review the plan
-terraform plan
+**Pipeline does:**
+1. ✅ Authenticates via OIDC (no access keys)
+2. ✅ Assumes IAM role from bootstrap
+3. ✅ Initializes Terraform with remote backend
+4. ✅ Creates/updates Lambda + DynamoDB table
+5. ✅ Deploys to `nonlive` environment (from develop) or `live` (from main)
 
-# Apply the configuration
+**GitHub secrets required:**
+```
+AWS_PIPELINE_ROLE_ARN = arn:aws:iam::590183661886:role/bball-app-template-pipeline-role
+AWS_REGION            = eu-west-3
+TF_STATE_BUCKET       = tfstate-590183661886-eu-west-3
+TF_LOCK_TABLE         = terraform-state-lock
+```
+
+---
+
+## 📝 Variables Configuration
+
+### Required Variables
+
+In `variables.tf`, these variables need values:
+
+| Variable | Description | Set By |
+|----------|-------------|--------|
+| `bootstrap_state_bucket` | S3 bucket with bootstrap state | Pipeline (from GitHub secret) |
+| `environment` | Deployment environment (`nonlive` or `live`) | Pipeline (from branch) |
+| `aws_region` | AWS region | Pipeline (from GitHub secret) |
+| `function_name` | Lambda function base name | `variables.tf` default |
+
+### Example Variable Usage
+
+```hcl
+# variables.tf
+variable "bootstrap_state_bucket" {
+  description = "S3 bucket containing bootstrap state"
+  type        = string
+  # Set by pipeline: -var="bootstrap_state_bucket=${TF_STATE_BUCKET}"
+  # Value: "tfstate-590183661886-eu-west-3" (same bucket as bootstrap)
+}
+
+variable "environment" {
+  description = "Environment (nonlive or live)"
+  type        = string
+  # Set by pipeline: -var="environment=nonlive"
+}
+
+variable "function_name" {
+  description = "Lambda function base name"
+  type        = string
+  default     = "bball-app-template"
+  # Can override in terraform.tfvars if needed
+}
+```
+
+**Important:** `bootstrap_state_bucket` is the **same S3 bucket** where bootstrap stores its state:
+- Bucket name: `tfstate-590183661886-eu-west-3`
+
+---
+
+## 🛠️ Troubleshooting
+
+### Pipeline Error: "Resources can't find bootstrap outputs"
+
+**Problem:** `data.tf` has wrong state key.
+
+**Solution:** Ensure `data.tf` has correct key matching bootstrap:
+
+```hcl
+data "terraform_remote_state" "bootstrap" {
+  backend = "s3"
+  config = {
+    bucket = var.bootstrap_state_bucket
+    key    = "bootstrap/roles-and-db-config.tfstate"  # Must match bootstrap backend.tf
+    region = var.aws_region
+  }
+}
+```
+
+### Pipeline Error: "State lock timeout"
+
+**Problem:** Previous pipeline run was interrupted, leaving a lock.
+
+**Solution:** Clear the lock in AWS Console:
+1. Go to DynamoDB → `terraform-state-lock` table (eu-west-3)
+2. Find item with key `resources/nonlive/bball-app-template.tfstate` (or live)
+3. Delete the lock item
+4. Re-run the pipeline
+
+### Pipeline Error: "Access Denied"
+
+**Problem:** IAM role permissions or GitHub OIDC setup.
+
+**Solution:**
+1. ✅ Verify GitHub secrets are set correctly
+2. ✅ Check bootstrap IAM role exists: `bball-app-template-pipeline-role`
+3. ✅ Verify workflow has `permissions: id-token: write`
+4. ✅ Check role trust policy allows your GitHub repo
+
+### Error: "DynamoDB table already exists"
+
+**Problem:** Table exists from previous deployment, but not in Terraform state.
+
+**Solution:** Import existing table:
+```bash
+terraform import aws_dynamodb_table.app_table bball-app-template-nonlive
 terraform apply
 ```
 
-### 3. Deploy Both Environments
+---
 
-To deploy both live and nonlive environments:
+## 🎯 Adding New Resources
 
-**Option A: Using separate tfvars files**
+To add EventBridge, API Gateway, or other resources:
 
-```bash
-# Deploy nonlive
-terraform apply -var-file=terraform.tfvars -var="environment=nonlive"
-
-# Deploy live
-terraform apply -var-file=terraform.tfvars -var="environment=live"
-```
-
-**Option B: Using workspaces**
+### 1. Create New Terraform File
 
 ```bash
-# Create and deploy nonlive
-terraform workspace new nonlive
-terraform apply -var="environment=nonlive"
+# terraform/resources/api_gateway.tf
+resource "aws_apigatewayv2_api" "lambda_api" {
+  name          = "${var.function_name}-${var.environment}-api"
+  protocol_type = "HTTP"
+}
 
-# Create and deploy live
-terraform workspace new live
-terraform apply -var="environment=live"
+resource "aws_apigatewayv2_integration" "lambda" {
+  api_id           = aws_apigatewayv2_api.lambda_api.id
+  integration_type = "AWS_PROXY"
+  integration_uri  = aws_lambda_function.function.invoke_arn
+}
 ```
 
-## Testing
+### 2. Push to GitHub
 
-After deployment, test the Lambda function:
+Pipeline automatically deploys the new resources! ✅
 
-```bash
-# Get the function name from outputs
-FUNCTION_NAME=$(terraform output -raw lambda_function_name)
+---
 
-# Invoke the function
-aws lambda invoke \
-  --function-name $FUNCTION_NAME \
-  --payload '{}' \
-  response.json
+## 📚 File Structure
 
-# View the response
-cat response.json
+```
+terraform/resources/
+├── backend.tf           # Where to store Terraform state
+├── data.tf              # Reference bootstrap outputs
+├── variables.tf         # Input variables
+├── lambda.tf            # Lambda function configuration
+├── dynamodb.tf          # DynamoDB table (per environment)
+├── outputs.tf           # Export values for other tools
+├── terraform.tfvars     # Variable values (optional, for local testing)
+└── README.md            # This file
 ```
 
-## Outputs
+---
 
-After deployment, you'll get:
+## 🎓 Key Concepts
 
-- `lambda_function_name`: Full function name (e.g., `bball-app-template-nonlive`)
-- `lambda_function_arn`: ARN of the Lambda function
-- `lambda_role_arn`: ARN of the execution role
-- `lambda_log_group`: CloudWatch log group name
-- `lambda_invoke_arn`: Invoke ARN (for API Gateway integration)
+### Remote State
 
-## Updating the Function
+Terraform stores its state in S3 (not locally):
+- ✅ Shared across team members and CI/CD
+- ✅ Locked via DynamoDB (prevents conflicts)
+- ✅ Versioned (can recover from mistakes)
+- ✅ Encrypted
 
-To update the Lambda code:
+### Data Sources
 
-1. Make changes to the Go code in `cmd/lambda/` or `internal/handler/`
-2. Run `terraform apply` - it will rebuild and redeploy automatically
+The `data` blocks read information without creating resources:
+- `data "terraform_remote_state" "bootstrap"` - Reads bootstrap outputs
+- Outputs become available as `data.terraform_remote_state.bootstrap.outputs.xxx`
 
-## Clean Up
+### Per-Environment Resources
 
-To remove all resources:
+Resources are created separately for each environment:
+- **Nonlive**: DynamoDB table `bball-app-template-nonlive`, Lambda `bball-app-template-nonlive`
+- **Live**: DynamoDB table `bball-app-template-live`, Lambda `bball-app-template-live`
+- State stored in different S3 keys: `resources/nonlive/...` vs `resources/live/...`
 
-```bash
-terraform destroy
-```
+---
 
-## Configuration Options
+## 📖 Next Steps
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `aws_region` | AWS region | `eu-west-3` |
-| `function_name` | Base function name | `bball-app-template` |
-| `environment` | Environment (live/nonlive) | Required |
-| `timeout` | Function timeout (seconds) | `30` |
-| `memory_size` | Function memory (MB) | `128` |
-| `log_retention_days` | Log retention period | `7` |
-
-## Troubleshooting
-
-### Build fails
-
-Ensure Go is installed and `go.mod` is properly configured:
-
-```bash
-go mod download
-go mod verify
-```
-
-### Permission errors
-
-Ensure your AWS credentials have permissions to create:
-- Lambda functions
-- IAM roles and policies
-- CloudWatch log groups
-
-### Function invocation fails
-
-Check the CloudWatch logs:
-
-```bash
-aws logs tail /aws/lambda/bball-app-template-nonlive --follow
-```
+1. ✅ Bootstrap deployed → Done (ran once locally)
+2. ✅ Resources configured → You're here
+3. 🚀 Push to GitHub → Pipeline deploys Lambda + DynamoDB
+4. 📊 Monitor in AWS Console → CloudWatch logs, DynamoDB tables
+5. 🎯 Add more resources → API Gateway, EventBridge, etc.
