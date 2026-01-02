@@ -16,27 +16,17 @@ class Service:
     
     def create_test_entry(self, name: str, value: int) -> Entry:
         """
-        Create a new test entry with validation.
+        Create a new test entry.
         
         Args:
-            name: Name of the entry (must not be empty)
-            value: Value of the entry (must be non-negative)
+            name: Name of the entry
+            value: Value of the entry
             
         Returns:
             Created Entry object
-            
-        Raises:
-            ValueError: If validation fails
         """
-        # Validation
-        if not name or not name.strip():
-            raise ValueError("Name cannot be empty")
-        
-        if value < 0:
-            raise ValueError("Value must be non-negative")
-        
         # Create entry
-        entry = Entry(name=name.strip(), value=value)
+        entry = Entry(name=name, value=value)
         return self.repository.create(entry)
     
     def get_test_entry(self, entry_id: str) -> Optional[Entry]:

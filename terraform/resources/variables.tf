@@ -7,6 +7,7 @@ variable "aws_region" {
 variable "bootstrap_state_bucket" {
   description = "Name of the S3 bucket containing bootstrap Terraform state"
   type        = string
+  default    = "tfstate-590183661886-eu-west-3"
 }
 
 variable "function_name" {
@@ -29,6 +30,12 @@ variable "timeout" {
   description = "Lambda function timeout in seconds"
   type        = number
   default     = 30
+}
+
+variable "project_name" {
+  description = "Name of the project (used for resource naming)"
+  type        = string
+  default     = "bball-app"
 }
 
 variable "memory_size" {

@@ -3,13 +3,20 @@ Messaging/Handler layer for Lambda events
 """
 import json
 import logging
+import os
 from typing import Any, Dict
+from jsonschema import validate, ValidationError
 
 from src.service.service import Service
 from src.repository.repository import Repository
 from src.database.database import DynamoDBConnection
 
 logger = logging.getLogger(__name__)
+
+# Load JSON Schema
+SCHEMA_PATH = os.path.join(os.path.dirname(__file__), 'schemas', 'lambda-event-schema.json')
+with open(SCHEMA_PATH, 'r') as f:
+    EVENT_SCHEMA = json.load(f)
 
 
 class Handler:
@@ -37,6 +44,9 @@ class Handler:
             Response with operation result
         """
         try:
+            # Validate event against JSON schema
+            validate(instance=event, schema=EVENT_SCHEMA)
+            
             action = event.get('action', 'create')
             data = event.get('data', {})
             
@@ -147,6 +157,14 @@ class Handler:
                     })
                 }
             
+        except ValidationError as e:
+            logger.warning(f"Schema validation error: {e.message}")
+            return {
+                'statusCode': 400,
+                'body': json.dumps({
+                    'error': f'Validation error: {e.message}'
+                })
+            }
         except ValueError as e:
             logger.warning(f"Validation error: {e}")
             return {

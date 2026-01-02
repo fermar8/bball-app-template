@@ -46,27 +46,6 @@ class TestServiceUnit:
         assert call_args.name == "Test Entry"
         assert call_args.value == 42
     
-    def test_create_test_entry_empty_name(self, service, mock_repository):
-        """Test creating entry with empty name fails"""
-        with pytest.raises(ValueError, match="Name cannot be empty"):
-            service.create_test_entry(name="", value=42)
-        
-        mock_repository.create.assert_not_called()
-    
-    def test_create_test_entry_whitespace_name(self, service, mock_repository):
-        """Test creating entry with whitespace-only name fails"""
-        with pytest.raises(ValueError, match="Name cannot be empty"):
-            service.create_test_entry(name="   ", value=42)
-        
-        mock_repository.create.assert_not_called()
-    
-    def test_create_test_entry_negative_value(self, service, mock_repository):
-        """Test creating entry with negative value fails"""
-        with pytest.raises(ValueError, match="must be non-negative"):
-            service.create_test_entry(name="Test", value=-1)
-        
-        mock_repository.create.assert_not_called()
-    
     def test_get_test_entry(self, service, mock_repository):
         """Test getting an entry by ID"""
         expected_entry = Entry(id="123", name="Test", value=42)

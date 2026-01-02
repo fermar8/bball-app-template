@@ -1,6 +1,9 @@
 # AWS SDK for DynamoDB
 boto3==1.34.162
 
+# JSON Schema validation
+jsonschema==4.21.1
+
 # Development dependencies
 pytest==8.0.0
 pytest-cov==4.1.0

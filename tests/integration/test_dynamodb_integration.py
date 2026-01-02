@@ -192,22 +192,6 @@ class TestServiceIntegration:
         assert result.name == "Test"
         assert result.value == 42
     
-    def test_create_invalid_name(self, dynamodb_table):
-        """Test creating entry with invalid name"""
-        repository = Repository()
-        service = Service(repository)
-        
-        with pytest.raises(ValueError, match="Name cannot be empty"):
-            service.create_test_entry(name="", value=42)
-    
-    def test_create_negative_value(self, dynamodb_table):
-        """Test creating entry with negative value"""
-        repository = Repository()
-        service = Service(repository)
-        
-        with pytest.raises(ValueError, match="must be non-negative"):
-            service.create_test_entry(name="Test", value=-1)
-    
     def test_get_entry(self, dynamodb_table):
         """Test getting entry through service"""
         repository = Repository()

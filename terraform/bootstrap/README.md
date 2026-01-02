@@ -1,78 +1,112 @@
 # Terraform Bootstrap
 
-This directory contains the bootstrap configuration that sets up:
-- S3 bucket for Terraform remote state
-- DynamoDB table for state locking
-- GitHub Actions OIDC provider
-- IAM role `bball-app-template-pipeline-role` for GitHub Actions
+This directory contains the bootstrap configuration that sets up the **foundation infrastructure** for your serverless application. This should be deployed **once** and shared across all our Lambda projects.
+
+## 🏗️ What Gets Created
+
+### State Management
+- **S3 Bucket**: Stores Terraform state files for all projects
+- **DynamoDB Table**: Provides state locking to prevent concurrent modifications
+
+### CI/CD Pipeline Authentication
+- **GitHub OIDC Provider**: Enables keyless authentication from GitHub Actions
+- **Pipeline IAM Role**: `bball-app-template-pipeline-role` with permissions to deploy Lambda functions and DynamoDB tables
+
+### State Location
+- **State Key**: `bootstrap/roles-and-db-config.tfstate`
+
+---
 
 ## ⚠️ Important: Run This First
 
-This bootstrap configuration must be deployed **before** the main resources, as it creates the backend infrastructure and pipeline role that other configurations depend on.
+Deploy bootstrap **before** running any pipelines or deploying resources. The bootstrap creates:
+1. The backend (S3 + DynamoDB) where Terraform stores state
+2. The IAM role that GitHub Actions uses to deploy resources
 
-## Setup Steps
+**📌 After Configuration Changes**: If you modified the backend state key in `backend.tf`, you must redeploy bootstrap before running the pipeline:
+
+```bash
+cd terraform/bootstrap
+terraform init -reconfigure  # Updates backend to new state key
+terraform apply              # Redeploys with new configuration
+```
+
+---
+
+## 📋 Setup Steps
 
 ### 1. Configure Variables
 
-Copy the example tfvars file:
-
-```bash
-cp terraform.tfvars.example terraform.tfvars
-```
-
-Edit `terraform.tfvars`:
+Edit `terraform.tfvars` with our values:
 
 ```hcl
-state_bucket_name = "bball-app-terraform-state-123456789012"  # Use your AWS account ID
-github_org        = "your-org"
-github_repo       = "your-repo"
-aws_region        = "eu-west-3"
+state_bucket_name = "tfstate-590183661886-eu-west-3"
+github_org        = "fermar8"                         
+github_repo       = "bball-app-template"              
+aws_region        = "eu-west-3"                       
 ```
 
-**Note**: S3 bucket names must be globally unique. Include your AWS account ID or another unique identifier.
+**💡 Tip**: Use `tfstate-{AWS_ACCOUNT_ID}-{REGION}` format for globally unique bucket names.
 
-### 2. Deploy Bootstrap Resources
+---
+
+### 2. Deploy Bootstrap (Local, One-Time)
 
 ```bash
-# Initialize Terraform (uses local state initially)
+# Initialize Terraform
 terraform init
 
-# Review the plan
+# If backend configuration changed (state key update), use:
+terraform init -reconfigure
+
+# Review what will be created
 terraform plan
 
 # Apply the configuration
 terraform apply
 ```
 
-### 3. Note the Outputs
+---
 
-After deployment, save these outputs:
+### 3. Save Important Outputs
+
+After deployment, save these values:
 
 ```bash
-# Pipeline role ARN (for GitHub Actions)
-terraform output pipeline_role_arn
+# View all outputs
+terraform output
 
-# State bucket name (for backend configuration)
-terraform output state_bucket_name
-
-# Lock table name (for backend configuration)
-terraform output lock_table_name
-
-# Get backend configuration template
-terraform output backend_config
+# Copy these for GitHub Actions configuration
+terraform output pipeline_role_arn    # For GitHub secret
+terraform output state_bucket_name    # For resources backend config
+terraform output lock_table_name      # For resources backend config
 ```
 
-### 4. Migrate Bootstrap to Remote State (Optional)
+---
 
-After creating the S3 bucket and DynamoDB table, you can migrate this bootstrap configuration to use remote state:
+### 4. Configure GitHub Repository Secrets
 
-Create `backend.tf`:
+Add these to your GitHub repository (Settings → Secrets and variables → Actions):
+
+**Secrets/Variables:**
+```
+AWS_PIPELINE_ROLE_ARN = <output from pipeline_role_arn>
+AWS_REGION            = eu-west-3
+TF_STATE_BUCKET       = <output from state_bucket_name>
+TF_LOCK_TABLE         = <output from lock_table_name>
+```
+
+---
+
+### 5. Bootstrap State is Automatically Remote
+
+The bootstrap creates the S3 bucket and DynamoDB table, then **Terraform automatically uses them** because of the `backend.tf` configuration:
 
 ```hcl
 terraform {
   backend "s3" {
     bucket         = "tfstate-590183661886-eu-west-3"
-    key            = "bootstrap/terraform.tfstate"
+    key            = "bootstrap/roles-and-db-config.tfstate"
     region         = "eu-west-3"
     dynamodb_table = "terraform-state-lock"
     encrypt        = true
@@ -80,106 +114,111 @@ terraform {
 }
 ```
 
-Then run:
+**How it works:**
+1. First `terraform init` - Backend doesn't exist yet, uses local state temporarily
+2. `terraform apply` - Creates S3 bucket + DynamoDB table
+3. Terraform automatically migrates local state → S3 after resources are created
+4. Future operations use remote state from S3
 
-```bash
-terraform init -migrate-state
-```
+**Result:** Bootstrap state is safely stored in S3, not on your local machine.
 
-### 5. Configure GitHub Repository
+---
 
-In your GitHub repository settings, add these variables:
+### 6. You're Done! 🎉
 
-- `AWS_PIPELINE_ROLE_ARN`: The pipeline role ARN from outputs
-- `AWS_REGION`: Your AWS region (e.g., `eu-west-3`)
-- `TF_STATE_BUCKET`: The S3 bucket name from outputs
-- `TF_LOCK_TABLE`: The DynamoDB table name from outputs
+Bootstrap is complete. Now you can:
+- ✅ Deploy Lambda functions via GitHub Actions pipeline
+- ✅ Create multiple Lambda projects that share this bootstrap
+- ✅ Add EventBridge, API Gateway, etc. in the resources layer
 
-### 6. Update Resources Configuration
+**Before running the pipeline**, ensure:
+1. ✅ Bootstrap has been applied successfully
+2. ✅ GitHub secrets are configured
+3. ✅ Resources `data.tf` references the correct state key: `bootstrap/roles-and-db-config.tfstate`
 
-In your `terraform/resources` directory, create or update `backend.tf`:
+---
 
-```hcl
-terraform {
-  backend "s3" {
-    bucket         = "tfstate-590183661886-eu-west-3"
-    key            = "resources/terraform.tfstate"
-    region         = "eu-west-3"
-    dynamodb_table = "terraform-state-lock"
-    encrypt        = true
-  }
-}
-```
+## 🔐 Security Features
 
-## What Gets Created
+✅ **No Access Keys**: Uses OIDC for passwordless GitHub Actions authentication  
+✅ **Encrypted State**: S3 encryption (AES256) and DynamoDB encryption at rest  
+✅ **Versioned State**: S3 versioning prevents accidental state deletions  
+✅ **State Locking**: DynamoDB prevents concurrent Terraform operations  
+✅ **Least Privilege**: IAM role permissions scoped to specific actions  
+✅ **Repository Scoped**: Role can only be assumed by your specific GitHub repo  
 
-### S3 State Bucket
-- **Purpose**: Store Terraform state files
-- **Features**: 
-  - Versioning enabled
-  - Encryption at rest (AES256)
-  - Public access blocked
-  - Secure by default
+---
 
-### DynamoDB Lock Table
-- **Purpose**: Prevent concurrent Terraform operations
-- **Features**:
-  - Pay-per-request billing
-  - Hash key: `LockID`
-  - Prevents state corruption
+## 🎯 What Belongs in Bootstrap vs Resources
 
-### GitHub OIDC Provider
-- **Purpose**: Enables keyless authentication from GitHub Actions
-- **Security**: No AWS access keys needed
+### ✅ Bootstrap (Deploy Once, Shared)
+- State backend (S3 + DynamoDB)
+- GitHub OIDC provider
+- Pipeline IAM roles
 
-### Pipeline IAM Role
-- **Name**: `bball-app-template-pipeline-role`
-- **Permissions**:
-  - Lambda function management
-  - IAM role management (for Lambda execution roles)
-  - CloudWatch Logs management
-  - S3 state access
-  - DynamoDB state locking
+### ❌ Resources (Deploy Per Project/Environment via Pipeline)
+- Lambda functions
+- DynamoDB tables (app-specific, created per environment)
+- EventBridge Scheduler
+- API Gateway
+- CloudWatch rules
+- SNS/SQS queues
 
-## Security Features
+**Rule of thumb**: If it costs money when idle or is shared across projects → Bootstrap. If it's pay-per-use and project-specific → Resources.
 
-✅ **No Access Keys**: Uses OIDC for GitHub Actions authentication  
-✅ **Encrypted State**: S3 encryption and DynamoDB encryption at rest  
-✅ **Versioned State**: S3 versioning prevents accidental deletions  
-✅ **State Locking**: DynamoDB prevents concurrent modifications  
-✅ **Least Privilege**: Role permissions scoped to specific resources  
-✅ **Repository Scoped**: Role can only be assumed by your GitHub repo  
+---
 
-## Troubleshooting
+## 🛠️ Troubleshooting
 
 ### Bucket name already exists
-S3 bucket names must be globally unique. Add your AWS account ID or a unique suffix:
+S3 bucket names must be globally unique across ALL AWS accounts:
+
 ```hcl
-state_bucket_name = "bball-app-terraform-state-123456789012"
+state_bucket_name = "tfstate-590183661886-eu-west-3"  # Include account ID
 ```
 
 ### OIDC provider already exists
-If you already have a GitHub OIDC provider:
+If you already created a GitHub OIDC provider in your AWS account:
+
 ```hcl
 create_oidc_provider       = false
-existing_oidc_provider_arn = "arn:aws:iam::123456789012:oidc-provider/token.actions.githubusercontent.com"
+existing_oidc_provider_arn = "arn:aws:iam::590183661886:oidc-provider/token.actions.githubusercontent.com"
 ```
 
-### Role assumption fails
-- Verify `github_org` and `github_repo` are correct
-- Check repository name matches exactly (case-sensitive)
-- Ensure workflow has `id-token: write` permission
-
-## Cleanup
-
-⚠️ **Warning**: Only destroy if you want to remove ALL state management infrastructure.
+### Resources already exist (after changing state key)
+If you changed the backend state key and see "already exists" errors:
 
 ```bash
-# This will destroy the state bucket, lock table, and pipeline role
+# Import existing resources into new state location
+terraform import aws_s3_bucket.terraform_state tfstate-590183661886-eu-west-3
+terraform import aws_dynamodb_table.terraform_locks terraform-state-lock
+terraform import 'aws_iam_openid_connect_provider.github[0]' 'arn:aws:iam::590183661886:oidc-provider/token.actions.githubusercontent.com'
+terraform import aws_iam_role.github_actions_pipeline bball-app-template-pipeline-role
+# ... import remaining policies
+terraform apply  # Creates any missing resources
+```
+
+### Backend configuration changed
+If you see "Backend configuration changed" errors after modifying `backend.tf`:
+
+```bash
+terraform init -reconfigure  # Reconfigure backend with new settings
+```
+
+---
+
+## 🧹 Cleanup
+
+⚠️ **Warning**: Only destroy if you want to remove ALL infrastructure for ALL projects.
+
+```bash
 terraform destroy
 ```
 
-Before destroying:
-1. Ensure no other projects are using this state bucket
-2. Back up any important state files
-3. Remove backend configurations from other projects
+**Before destroying:**
+1. ✅ Destroy all resources in `terraform/resources` first
+2. ✅ Ensure no other projects use this state bucket
+3. ✅ Back up important state files from S3
+4. ✅ Remove GitHub secrets/variables
+
+

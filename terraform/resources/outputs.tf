@@ -23,13 +23,13 @@ output "lambda_invoke_arn" {
   value       = aws_lambda_function.function.invoke_arn
 }
 
-# DynamoDB outputs (from bootstrap)
+# DynamoDB outputs (from local resources)
 output "dynamodb_table_name" {
   description = "Name of the DynamoDB table used by this Lambda"
-  value       = var.environment == "live" ? data.terraform_remote_state.bootstrap.outputs.dynamodb_table_live_name : data.terraform_remote_state.bootstrap.outputs.dynamodb_table_nonlive_name
+  value       = aws_dynamodb_table.app_table.name
 }
 
 output "dynamodb_table_arn" {
   description = "ARN of the DynamoDB table used by this Lambda"
-  value       = var.environment == "live" ? data.terraform_remote_state.bootstrap.outputs.dynamodb_table_live_arn : data.terraform_remote_state.bootstrap.outputs.dynamodb_table_nonlive_arn
+  value       = aws_dynamodb_table.app_table.arn
 }

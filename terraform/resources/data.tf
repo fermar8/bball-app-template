@@ -6,7 +6,7 @@ data "terraform_remote_state" "bootstrap" {
   
   config = {
     bucket = var.bootstrap_state_bucket
-    key    = "bootstrap/terraform.tfstate"
+    key    = "bootstrap/roles-and-db-config.tfstate"
     region = var.aws_region
   }
 }

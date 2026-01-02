@@ -62,8 +62,8 @@ resource "aws_lambda_function" "function" {
 
   environment {
     variables = {
-      ENVIRONMENT        = var.environment
-      DYNAMODB_TABLE_NAME = var.environment == "live" ? data.terraform_remote_state.bootstrap.outputs.dynamodb_table_live_name : data.terraform_remote_state.bootstrap.outputs.dynamodb_table_nonlive_name
+      ENVIRONMENT         = var.environment
+      DYNAMODB_TABLE_NAME = aws_dynamodb_table.app_table.name
     }
   }
 
@@ -100,8 +100,8 @@ resource "aws_iam_policy" "lambda_dynamodb" {
           "dynamodb:Scan"
         ]
         Resource = [
-          var.environment == "live" ? data.terraform_remote_state.bootstrap.outputs.dynamodb_table_live_arn : data.terraform_remote_state.bootstrap.outputs.dynamodb_table_nonlive_arn,
-          "${var.environment == "live" ? data.terraform_remote_state.bootstrap.outputs.dynamodb_table_live_arn : data.terraform_remote_state.bootstrap.outputs.dynamodb_table_nonlive_arn}/index/*"
+          aws_dynamodb_table.app_table.arn,
+          "${aws_dynamodb_table.app_table.arn}/index/*"
         ]
       }
     ]

@@ -121,22 +121,40 @@ class TestHandlerUnit:
         body = json.loads(response['body'])
         assert body['message'] == 'Entry deleted successfully'
     
-    def test_handle_validation_error(self, handler, mock_service):
-        """Test action with validation error from service"""
-        mock_service.create_test_entry.side_effect = ValueError("Name cannot be empty")
-        
-        event = {'action': 'create', 'data': {'name': ''}}
+    def test_handle_schema_validation_empty_name(self, handler, mock_service):
+        """Test create with empty name fails schema validation"""
+        event = {'action': 'create', 'data': {'name': '', 'value': 42}}
         response = handler.handle(event)
         
         assert response['statusCode'] == 400
         body = json.loads(response['body'])
-        assert body['error'] == 'Name cannot be empty'
+        assert 'Validation error' in body['error']
+        mock_service.create_test_entry.assert_not_called()
     
-    def test_handle_unknown_action(self, handler, mock_service):
-        """Test unknown action"""
-        event = {'action': 'unknown'}
+    def test_handle_schema_validation_negative_value(self, handler, mock_service):
+        """Test create with negative value fails schema validation"""
+        event = {'action': 'create', 'data': {'name': 'Test', 'value': -1}}
         response = handler.handle(event)
         
         assert response['statusCode'] == 400
         body = json.loads(response['body'])
-        assert 'Unknown action' in body['error']
+        assert 'Validation error' in body['error']
+        mock_service.create_test_entry.assert_not_called()
+    
+    def test_handle_schema_validation_missing_action(self, handler, mock_service):
+        """Test event missing action field fails schema validation"""
+        event = {'data': {'name': 'Test', 'value': 42}}
+        response = handler.handle(event)
+        
+        assert response['statusCode'] == 400
+        body = json.loads(response['body'])
+        assert 'Validation error' in body['error']
+    
+    def test_handle_schema_validation_invalid_action(self, handler, mock_service):
+        """Test event with invalid action fails schema validation"""
+        event = {'action': 'invalid', 'data': {}}
+        response = handler.handle(event)
+        
+        assert response['statusCode'] == 400
+        body = json.loads(response['body'])
+        assert 'Validation error' in body['error']
