@@ -212,7 +212,9 @@ resource "aws_iam_policy" "iam_management" {
           "iam:GetPolicyVersion",
           "iam:ListPolicyVersions",
           "iam:CreatePolicyVersion",
-          "iam:DeletePolicyVersion"
+          "iam:DeletePolicyVersion",
+          "iam:TagPolicy",
+          "iam:UntagPolicy"
         ]
         Resource = [
           "arn:aws:iam::*:policy/bball-app-template-*"
