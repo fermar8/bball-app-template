@@ -228,13 +228,6 @@ resource "aws_iam_policy" "iam_management" {
         Resource = [
           "arn:aws:iam::*:role/bball-app-template-*"
         ]
-        Condition = {
-          StringEquals = {
-            "iam:PolicyARN" = [
-              "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
-            ]
-          }
-        }
       }
     ]
   })
@@ -352,6 +345,153 @@ resource "aws_iam_policy" "dynamodb_state_lock" {
   }
 }
 
+# IAM Policy for DynamoDB Table Management
+resource "aws_iam_policy" "dynamodb_management" {
+  name        = "bball-app-template-dynamodb-management"
+  description = "Permissions for managing DynamoDB tables"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "DynamoDBTableManagement"
+        Effect = "Allow"
+        Action = [
+          "dynamodb:CreateTable",
+          "dynamodb:DeleteTable",
+          "dynamodb:DescribeTable",
+          "dynamodb:DescribeContinuousBackups",
+          "dynamodb:DescribeTimeToLive",
+          "dynamodb:ListTagsOfResource",
+          "dynamodb:TagResource",
+          "dynamodb:UntagResource",
+          "dynamodb:UpdateTable",
+          "dynamodb:UpdateTimeToLive",
+          "dynamodb:UpdateContinuousBackups"
+        ]
+        Resource = [
+          "arn:aws:dynamodb:${var.aws_region}:*:table/bball-app-*",
+          "arn:aws:dynamodb:${var.aws_region}:*:table/${var.project_name}-*"
+        ]
+      }
+    ]
+  })
+
+  tags = {
+    Name      = "bball-app-template-dynamodb-management"
+    ManagedBy = "terraform"
+  }
+}
+
+# IAM Policy for Additional AWS Services (EventBridge, SNS, SQS, etc.)
+resource "aws_iam_policy" "additional_services" {
+  name        = "bball-app-template-additional-services"
+  description = "Permissions for EventBridge Scheduler, SNS, SQS, and other common services"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "EventBridgeScheduler"
+        Effect = "Allow"
+        Action = [
+          "scheduler:CreateSchedule",
+          "scheduler:DeleteSchedule",
+          "scheduler:GetSchedule",
+          "scheduler:ListSchedules",
+          "scheduler:UpdateSchedule",
+          "scheduler:TagResource",
+          "scheduler:UntagResource",
+          "scheduler:ListTagsForResource"
+        ]
+        Resource = [
+          "arn:aws:scheduler:${var.aws_region}:*:schedule/default/bball-app-*",
+          "arn:aws:scheduler:${var.aws_region}:*:schedule/default/${var.project_name}-*"
+        ]
+      },
+      {
+        Sid    = "SNSTopicManagement"
+        Effect = "Allow"
+        Action = [
+          "sns:CreateTopic",
+          "sns:DeleteTopic",
+          "sns:GetTopicAttributes",
+          "sns:SetTopicAttributes",
+          "sns:Subscribe",
+          "sns:Unsubscribe",
+          "sns:ListSubscriptionsByTopic",
+          "sns:TagResource",
+          "sns:UntagResource"
+        ]
+        Resource = [
+          "arn:aws:sns:${var.aws_region}:*:bball-app-*",
+          "arn:aws:sns:${var.aws_region}:*:${var.project_name}-*"
+        ]
+      },
+      {
+        Sid    = "SQSQueueManagement"
+        Effect = "Allow"
+        Action = [
+          "sqs:CreateQueue",
+          "sqs:DeleteQueue",
+          "sqs:GetQueueAttributes",
+          "sqs:SetQueueAttributes",
+          "sqs:TagQueue",
+          "sqs:UntagQueue",
+          "sqs:ListQueueTags"
+        ]
+        Resource = [
+          "arn:aws:sqs:${var.aws_region}:*:bball-app-*",
+          "arn:aws:sqs:${var.aws_region}:*:${var.project_name}-*"
+        ]
+      },
+      {
+        Sid    = "ApiGatewayManagement"
+        Effect = "Allow"
+        Action = [
+          "apigateway:GET",
+          "apigateway:POST",
+          "apigateway:PUT",
+          "apigateway:PATCH",
+          "apigateway:DELETE"
+        ]
+        Resource = [
+          "arn:aws:apigateway:${var.aws_region}::/restapis",
+          "arn:aws:apigateway:${var.aws_region}::/restapis/*"
+        ]
+      },
+      {
+        Sid    = "S3BucketManagement"
+        Effect = "Allow"
+        Action = [
+          "s3:CreateBucket",
+          "s3:DeleteBucket",
+          "s3:GetBucketPolicy",
+          "s3:PutBucketPolicy",
+          "s3:DeleteBucketPolicy",
+          "s3:GetBucketVersioning",
+          "s3:PutBucketVersioning",
+          "s3:GetBucketTagging",
+          "s3:PutBucketTagging",
+          "s3:GetBucketPublicAccessBlock",
+          "s3:PutBucketPublicAccessBlock",
+          "s3:GetEncryptionConfiguration",
+          "s3:PutEncryptionConfiguration"
+        ]
+        Resource = [
+          "arn:aws:s3:::bball-app-*",
+          "arn:aws:s3:::${var.project_name}-*"
+        ]
+      }
+    ]
+  })
+
+  tags = {
+    Name      = "bball-app-template-additional-services"
+    ManagedBy = "terraform"
+  }
+}
+
 # Attach all policies to the pipeline role
 resource "aws_iam_role_policy_attachment" "lambda_management" {
   role       = aws_iam_role.github_actions_pipeline.name
@@ -376,4 +516,14 @@ resource "aws_iam_role_policy_attachment" "s3_state_access" {
 resource "aws_iam_role_policy_attachment" "dynamodb_state_lock" {
   role       = aws_iam_role.github_actions_pipeline.name
   policy_arn = aws_iam_policy.dynamodb_state_lock.arn
+}
+
+resource "aws_iam_role_policy_attachment" "dynamodb_management" {
+  role       = aws_iam_role.github_actions_pipeline.name
+  policy_arn = aws_iam_policy.dynamodb_management.arn
+}
+
+resource "aws_iam_role_policy_attachment" "additional_services" {
+  role       = aws_iam_role.github_actions_pipeline.name
+  policy_arn = aws_iam_policy.additional_services.arn
 }
