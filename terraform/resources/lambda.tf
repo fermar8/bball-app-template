@@ -54,7 +54,7 @@ resource "aws_lambda_function" "function" {
   filename         = data.archive_file.lambda_zip.output_path
   function_name    = "${var.function_name}-${var.environment}"
   role            = aws_iam_role.lambda_role.arn
-  handler         = "messaging.handler.lambda_handler"
+  handler         = "src.messaging.handler.lambda_handler"
   source_code_hash = data.archive_file.lambda_zip.output_base64sha256
   runtime         = "python3.12"
   timeout         = var.timeout

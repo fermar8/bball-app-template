@@ -37,8 +37,8 @@ jobs:
 
       - name: Create Lambda package
         run: |
-          mkdir -p lambda-package
-          cp -r src/* lambda-package/
+          mkdir -p lambda-package/src
+          cp -r src/* lambda-package/src/
           if [ -s requirements.txt ]; then
             pip install -r requirements.txt -t lambda-package/
           fi
