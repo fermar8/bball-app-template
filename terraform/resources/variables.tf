@@ -7,7 +7,7 @@ variable "aws_region" {
 variable "bootstrap_state_bucket" {
   description = "Name of the S3 bucket containing bootstrap Terraform state"
   type        = string
-  default    = "tfstate-590183661886-eu-west-3"
+  default     = "tfstate-590183661886-eu-west-3"
 }
 
 variable "function_name" {
@@ -19,7 +19,7 @@ variable "function_name" {
 variable "environment" {
   description = "Deployment environment (live or nonlive)"
   type        = string
-  
+
   validation {
     condition     = contains(["live", "nonlive"], var.environment)
     error_message = "Environment must be either 'live' or 'nonlive'."
@@ -57,4 +57,22 @@ variable "tags" {
     Project   = "bball-app"
     ManagedBy = "terraform"
   }
+}
+
+variable "scheduler_enabled" {
+  description = "Enable/disable EventBridge Scheduler"
+  type        = bool
+  default     = false
+}
+
+variable "scheduler_expression" {
+  description = "Schedule expression (rate(...) or cron(...))"
+  type        = string
+  default     = "rate(2 hours)"
+}
+
+variable "scheduler_allow_live" {
+  description = "Explicit opt-in to allow enabling the scheduler in live"
+  type        = bool
+  default     = false
 }
