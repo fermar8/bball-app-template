@@ -100,11 +100,11 @@ jobs:
 
       - name: Terraform Plan
         working-directory: ./terraform/resources
-        run: terraform plan -var="environment=nonlive" -no-color
+        run: terraform plan -var-file="nonlive.tfvars" -no-color
 
       - name: Terraform Apply
         working-directory: ./terraform/resources
-        run: terraform apply -var="environment=nonlive" -auto-approve
+        run: terraform apply -var-file="nonlive.tfvars" -auto-approve -no-color
 
   deploy-live:
     name: Deploy to Live (Production)
@@ -157,12 +157,11 @@ jobs:
 
       - name: Terraform Plan
         working-directory: ./terraform/resources
-        run: terraform plan -var="environment=live" -no-color
+        run: terraform plan -var-file="live.tfvars" -no-color
 
       - name: Terraform Apply
         working-directory: ./terraform/resources
-        run: terraform apply -var="environment=live" -auto-approve
-
+        run: terraform apply -var-file="live.tfvars" -auto-approve -no-color
   create-release:
     name: Create GitHub Release
     runs-on: ubuntu-latest

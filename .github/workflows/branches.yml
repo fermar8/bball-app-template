@@ -74,4 +74,4 @@ jobs:
 
       - name: Terraform Plan
         working-directory: ./terraform/resources
-        run: terraform plan -var="environment=nonlive" -no-color
+        run: terraform plan -var-file="nonlive.tfvars" -no-color
