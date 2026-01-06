@@ -1,74 +1,34 @@
-# Purpose: trigger the Lambda on a schedule.
-# Safety: disabled by default in live via live.tfvars
 
-# IAM role assumed by EventBridge Scheduler to invoke the Lambda target
-resource "aws_iam_role" "scheduler_invoke_role" {
-  name = "${var.function_name}-${var.environment}-scheduler-role"
-
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [{
-      Effect    = "Allow"
-      Principal = { Service = "scheduler.amazonaws.com" }
-      Action    = "sts:AssumeRole"
-    }]
-  })
+resource "aws_cloudwatch_event_rule" "lambda_schedule" {
+  name                = "${var.function_name}-schedule-${var.environment}"
+  description         = "Trigger Lambda function on a schedule"
+  schedule_expression = var.scheduler_expression
+  state               = var.scheduler_enabled ? "ENABLED" : "DISABLED"
 
   tags = merge(var.tags, { Environment = var.environment })
 }
 
-# Policy allowing the scheduler role to invoke the Lambda
-resource "aws_iam_policy" "scheduler_invoke_lambda" {
-  name        = "${var.function_name}-${var.environment}-scheduler-invoke-lambda"
-  description = "Allow EventBridge Scheduler to invoke the Lambda"
+# Target: connect the rule to the Lambda function
+resource "aws_cloudwatch_event_target" "lambda_target" {
+  rule      = aws_cloudwatch_event_rule.lambda_schedule.name
+  target_id = "LambdaTarget"
+  arn       = aws_lambda_function.function.arn
 
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [{
-      Effect = "Allow"
-      Action = ["lambda:InvokeFunction"]
-      Resource = [
-        aws_lambda_function.function.arn,
-        "${aws_lambda_function.function.arn}:*"
-      ]
-    }]
+  input = jsonencode({
+    action = "create",
+    data: {
+    name: "Test Entry",
+    value: 42
+  }
   })
-
-  tags = merge(var.tags, { Environment = var.environment })
 }
 
-resource "aws_iam_role_policy_attachment" "scheduler_invoke_lambda" {
-  role       = aws_iam_role.scheduler_invoke_role.name
-  policy_arn = aws_iam_policy.scheduler_invoke_lambda.arn
-}
-
-# Lambda permission to allow EventBridge Scheduler to invoke it
-resource "aws_lambda_permission" "allow_scheduler" {
-  statement_id  = "AllowExecutionFromEventBridgeScheduler"
+# Lambda permission to allow EventBridge to invoke it
+resource "aws_lambda_permission" "allow_eventbridge" {
+  statement_id  = "AllowExecutionFromEventBridge"
   action        = "lambda:InvokeFunction"
   function_name = aws_lambda_function.function.function_name
-  principal     = "scheduler.amazonaws.com"
-  source_arn    = aws_scheduler_schedule.lambda_schedule.arn
+  principal     = "events.amazonaws.com"
+  source_arn    = aws_cloudwatch_event_rule.lambda_schedule.arn
 }
 
-# The schedule itself (created in both envs, but disabled live by default)
-resource "aws_scheduler_schedule" "lambda_schedule" {
-  name                = "${var.function_name}-${var.environment}-schedule"
-  schedule_expression = var.scheduler_expression
-
-  state = var.scheduler_enabled ? "ENABLED" : "DISABLED"
-
-  flexible_time_window {
-    mode = "OFF"
-  }
-
-  target {
-    arn      = aws_lambda_function.function.arn
-    role_arn = aws_iam_role.scheduler_invoke_role.arn
-
-    input = jsonencode({
-      action = "create"
-    })
-  }
-
-}

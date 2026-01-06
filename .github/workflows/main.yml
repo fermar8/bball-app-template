@@ -114,18 +114,8 @@ jobs:
     permissions:
       id-token: write
       contents: read
-      issues: write
 
     steps:
-      - name: Manual Approval Required
-        uses: trstringer/manual-approval@v1
-        with:
-          secret: ${{ github.TOKEN }}
-          approvers: fermar8,raulnusa98
-          minimum-approvals: 1
-          issue-title: "Deploy to Live Environment"
-          issue-body: "Please approve or deny the deployment to production."
-
       - name: Checkout code
         uses: actions/checkout@v4
 

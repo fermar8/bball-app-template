@@ -110,7 +110,3 @@ The project includes automated GitHub Actions workflows:
 - **main.yml**: Runs on main branch - deploys to nonlive, then live (with approval)
 
 All tests run automatically in the pipeline with no database setup required (moto handles DynamoDB mocking).
-
-## License
-
-See LICENSE file.
