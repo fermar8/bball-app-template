@@ -71,8 +71,4 @@ variable "scheduler_expression" {
   default     = "rate(2 hours)"
 }
 
-variable "scheduler_allow_live" {
-  description = "Explicit opt-in to allow enabling the scheduler in live"
-  type        = bool
-  default     = false
-}
+
