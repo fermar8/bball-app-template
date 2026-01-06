@@ -42,6 +42,15 @@ resource "aws_iam_role_policy_attachment" "scheduler_invoke_lambda" {
   policy_arn = aws_iam_policy.scheduler_invoke_lambda.arn
 }
 
+# Lambda permission to allow EventBridge Scheduler to invoke it
+resource "aws_lambda_permission" "allow_scheduler" {
+  statement_id  = "AllowExecutionFromEventBridgeScheduler"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.function.function_name
+  principal     = "scheduler.amazonaws.com"
+  source_arn    = aws_scheduler_schedule.lambda_schedule.arn
+}
+
 # The schedule itself (created in both envs, but disabled live by default)
 resource "aws_scheduler_schedule" "lambda_schedule" {
   name                = "${var.function_name}-${var.environment}-schedule"
