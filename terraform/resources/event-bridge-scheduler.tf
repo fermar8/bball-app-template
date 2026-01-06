@@ -57,9 +57,8 @@ resource "aws_scheduler_schedule" "lambda_schedule" {
     arn      = aws_lambda_function.function.arn
     role_arn = aws_iam_role.scheduler_invoke_role.arn
 
-    # Simple payload for now; Lambda can branch on "action" later if needed as it states in handler.py
     input = jsonencode({
-      action = "list"
+      action = "create"
     })
   }
 
