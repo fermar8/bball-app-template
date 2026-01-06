@@ -48,6 +48,8 @@ htmlcov/
 *.tfstate.*
 *.tfvars
 !*.tfvars.example
+!nonlive.tfvars
+!live.tfvars
 .terraform/
 .terraform.lock.hcl
 backend.hcl
