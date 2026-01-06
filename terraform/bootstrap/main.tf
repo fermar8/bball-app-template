@@ -411,8 +411,28 @@ resource "aws_iam_policy" "additional_services" {
           "arn:aws:scheduler:${var.aws_region}:*:schedule/default/${var.project_name}-*"
         ]
       },
-      {
-        Sid    = "SNSTopicManagement"
+      {        Sid    = "EventBridgeRulesManagement"
+        Effect = "Allow"
+        Action = [
+          "events:PutRule",
+          "events:DeleteRule",
+          "events:DescribeRule",
+          "events:ListRules",
+          "events:EnableRule",
+          "events:DisableRule",
+          "events:PutTargets",
+          "events:RemoveTargets",
+          "events:ListTargetsByRule",
+          "events:TagResource",
+          "events:UntagResource",
+          "events:ListTagsForResource"
+        ]
+        Resource = [
+          "arn:aws:events:${var.aws_region}:*:rule/bball-app-*",
+          "arn:aws:events:${var.aws_region}:*:rule/${var.project_name}-*"
+        ]
+      },
+      {        Sid    = "SNSTopicManagement"
         Effect = "Allow"
         Action = [
           "sns:CreateTopic",
