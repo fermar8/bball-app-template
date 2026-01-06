@@ -68,7 +68,7 @@ variable "scheduler_enabled" {
 variable "scheduler_expression" {
   description = "Schedule expression (rate(...) or cron(...))"
   type        = string
-  default     = "rate(2 hours)"
+  default     = "cron(0 9 * * ? *)"
 }
 
 
