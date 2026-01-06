@@ -1,17 +1,5 @@
-############################################
-# EventBridge Scheduler (DEV-8)
 # Purpose: trigger the Lambda on a schedule.
-# Safety: always DISABLED in live to avoid costs.
-############################################
-
-locals {
-  # Safety guard:
-  # - scheduler_enabled must be true
-  # - live requires an explicit opt-in via scheduler_allow_live
-  effective_scheduler_enabled = var.scheduler_enabled && (
-    var.environment == "nonlive" || var.scheduler_allow_live
-  )
-}
+# Safety: disabled by default in live via live.tfvars
 
 # IAM role assumed by EventBridge Scheduler to invoke the Lambda target
 resource "aws_iam_role" "scheduler_invoke_role" {
@@ -59,7 +47,7 @@ resource "aws_scheduler_schedule" "lambda_schedule" {
   name                = "${var.function_name}-${var.environment}-schedule"
   schedule_expression = var.scheduler_expression
 
-  state = local.effective_scheduler_enabled ? "ENABLED" : "DISABLED"
+  state = var.scheduler_enabled ? "ENABLED" : "DISABLED"
 
   flexible_time_window {
     mode = "OFF"
