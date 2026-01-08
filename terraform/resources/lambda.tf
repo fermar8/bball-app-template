@@ -60,6 +60,13 @@ resource "aws_lambda_function" "function" {
   timeout         = var.timeout
   memory_size     = var.memory_size
 
+  dynamic "dead_letter_config" {
+    for_each = var.environment == "live" ? [1] : []
+    content {
+      target_arn = aws_sqs_queue.lambda_deadletter[0].arn
+    }
+  }
+
   environment {
     variables = {
       ENVIRONMENT         = var.environment
@@ -79,6 +86,34 @@ resource "aws_lambda_function" "function" {
     aws_iam_role_policy_attachment.lambda_basic,
     aws_iam_role_policy_attachment.lambda_dynamodb
   ]
+}
+
+# Allow Lambda service to send failed async invocation events to the DLQ (LIVE only)
+resource "aws_iam_policy" "lambda_dlq" {
+  count       = var.environment == "live" ? 1 : 0
+  name        = "${var.function_name}-${var.environment}-lambda-dlq-policy"
+  description = "Allow Lambda to send failed events to SQS DLQ"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "sqs:SendMessage"
+        ]
+        Resource = aws_sqs_queue.lambda_deadletter[0].arn
+      }
+    ]
+  })
+
+  tags = merge(var.tags, { Environment = var.environment })
+}
+
+resource "aws_iam_role_policy_attachment" "lambda_dlq" {
+  count      = var.environment == "live" ? 1 : 0
+  role       = aws_iam_role.lambda_role.name
+  policy_arn = aws_iam_policy.lambda_dlq[0].arn
 }
 
 # IAM Policy for Lambda to access DynamoDB
