@@ -35,31 +35,6 @@ resource "aws_cloudwatch_metric_alarm" "lambda_errors" {
   })
 }
 
-# CloudWatch Alarm - Lambda Throttles
-resource "aws_cloudwatch_metric_alarm" "lambda_throttles" {
-  count               = var.environment == "live" ? 1 : 0
-  alarm_name          = "${var.function_name}-${var.environment}-throttles"
-  comparison_operator = "GreaterThanThreshold"
-  evaluation_periods  = 1
-  metric_name         = "Throttles"
-  namespace           = "AWS/Lambda"
-  period              = 60
-  statistic           = "Sum"
-  threshold           = 0
-  alarm_description   = "Triggers when Lambda function is throttled"
-  treat_missing_data  = "notBreaching"
-
-  dimensions = {
-    FunctionName = aws_lambda_function.function.function_name
-  }
-
-  alarm_actions = [aws_sns_topic.lambda_alarms[0].arn]
-
-  tags = merge(var.tags, { 
-    Environment = var.environment
-  })
-}
-
 # Email subscriptions for alarms
 resource "aws_sns_topic_subscription" "lambda_alarms_email" {
   for_each  = var.environment == "live" ? toset(var.alarm_emails) : []
