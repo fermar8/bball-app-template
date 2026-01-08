@@ -14,6 +14,15 @@ resource "aws_cloudwatch_event_target" "lambda_target" {
   target_id = "LambdaTarget"
   arn       = aws_lambda_function.function.arn
 
+  # Retry policy for EventBridge -> Lambda deliveries.
+  dynamic "retry_policy" {
+    for_each = var.environment == "live" ? [1] : []
+    content {
+      maximum_event_age_in_seconds = 60
+      maximum_retry_attempts       = 0
+    }
+  }
+
   input = jsonencode({
     action = "create",
     data: {
