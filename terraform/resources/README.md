@@ -8,8 +8,7 @@ This directory contains **per-project Lambda infrastructure** that gets deployed
 - **DynamoDB Table**: Created per environment (nonlive/live)
 - **IAM Role**: Lambda execution permissions
 - **CloudWatch Logs**: Function logging
-
----
+- **SQS Dead Letter Queue (Live only)**: Stores failed events so they can be replayed later
 
 ## ⚙️ How It Works
 
@@ -275,6 +274,8 @@ terraform/resources/
 ├── variables.tf         # Input variables
 ├── lambda.tf            # Lambda function configuration
 ├── dynamodb.tf          # DynamoDB table (per environment)
+├── sqs-dlq.tf            # Dead Letter Queue (live only)
+├── event-bridge-event-rule-scheduler.tf  # Scheduled trigger (optional)
 ├── outputs.tf           # Export values for other tools
 ├── terraform.tfvars     # Variable values (optional, for local testing)
 └── README.md            # This file
