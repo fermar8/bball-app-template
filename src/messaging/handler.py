@@ -206,6 +206,11 @@ def lambda_handler(event, context):
     logger.setLevel(logging.INFO)
     logger.info("Processing Lambda request")
     logger.info(f"Event: {json.dumps(event)}")
+
+    # Force a failure to test retry and DLQ behavior
+    if event.get("action") == "test_failure":
+        logger.error("Simulating failure for DLQ testing")
+        raise RuntimeError("Intentional failure to test DLQ and retry mechanism")
     
     try:
         # Initialize DynamoDB connection (once per container)
