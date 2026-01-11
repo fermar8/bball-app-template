@@ -84,7 +84,8 @@ resource "aws_lambda_function" "function" {
   depends_on = [
     aws_cloudwatch_log_group.lambda_logs,
     aws_iam_role_policy_attachment.lambda_basic,
-    aws_iam_role_policy_attachment.lambda_dynamodb
+    aws_iam_role_policy_attachment.lambda_dynamodb,
+    aws_iam_role_policy_attachment.lambda_dlq
   ]
 }
 
@@ -154,4 +155,54 @@ resource "aws_iam_policy" "lambda_dynamodb" {
 resource "aws_iam_role_policy_attachment" "lambda_dynamodb" {
   role       = aws_iam_role.lambda_role.name
   policy_arn = aws_iam_policy.lambda_dynamodb.arn
+}
+
+# IAM Policy for Lambda to read from DLQ (for replay mechanism)
+resource "aws_iam_policy" "lambda_read_dlq" {
+  count       = var.environment == "live" ? 1 : 0
+  name        = "${var.function_name}-${var.environment}-read-dlq-policy"
+  description = "Allow Lambda to read messages from SQS DLQ for replay"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "sqs:ReceiveMessage",
+          "sqs:DeleteMessage",
+          "sqs:GetQueueAttributes"
+        ]
+        Resource = aws_sqs_queue.lambda_deadletter[0].arn
+      }
+    ]
+  })
+
+  tags = merge(var.tags, { Environment = var.environment })
+}
+
+resource "aws_iam_role_policy_attachment" "lambda_read_dlq" {
+  count      = var.environment == "live" ? 1 : 0
+  role       = aws_iam_role.lambda_role.name
+  policy_arn = aws_iam_policy.lambda_read_dlq[0].arn
+}
+
+# Event Source Mapping: DLQ processor (enabled for testing and replay)
+resource "aws_lambda_event_source_mapping" "dlq_processor" {
+  count            = var.environment == "live" ? 1 : 0
+  event_source_arn = aws_sqs_queue.lambda_deadletter[0].arn
+  function_name    = aws_lambda_function.function.arn
+  batch_size       = 1
+  enabled          = true
+  
+  # Retry attempts when processing messages from DLQ
+  function_response_types = ["ReportBatchItemFailures"]
+  
+  # Maximum number of times to retry failed messages from DLQ
+  # After this, messages stay in DLQ for manual inspection
+  maximum_retry_attempts = 2
+
+  depends_on = [
+    aws_iam_role_policy_attachment.lambda_read_dlq
+  ]
 }
