@@ -60,6 +60,13 @@ resource "aws_lambda_function" "function" {
   timeout         = var.timeout
   memory_size     = var.memory_size
 
+  dynamic "dead_letter_config" {
+    for_each = var.environment == "live" ? [1] : []
+    content {
+      target_arn = aws_sqs_queue.lambda_deadletter[0].arn
+    }
+  }
+
   environment {
     variables = {
       ENVIRONMENT         = var.environment
@@ -77,8 +84,37 @@ resource "aws_lambda_function" "function" {
   depends_on = [
     aws_cloudwatch_log_group.lambda_logs,
     aws_iam_role_policy_attachment.lambda_basic,
-    aws_iam_role_policy_attachment.lambda_dynamodb
+    aws_iam_role_policy_attachment.lambda_dynamodb,
+    aws_iam_role_policy_attachment.lambda_dlq
   ]
+}
+
+# Allow Lambda service to send failed async invocation events to the DLQ (LIVE only)
+resource "aws_iam_policy" "lambda_dlq" {
+  count       = var.environment == "live" ? 1 : 0
+  name        = "${var.function_name}-${var.environment}-lambda-dlq-policy"
+  description = "Allow Lambda to send failed events to SQS DLQ"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "sqs:SendMessage"
+        ]
+        Resource = aws_sqs_queue.lambda_deadletter[0].arn
+      }
+    ]
+  })
+
+  tags = merge(var.tags, { Environment = var.environment })
+}
+
+resource "aws_iam_role_policy_attachment" "lambda_dlq" {
+  count      = var.environment == "live" ? 1 : 0
+  role       = aws_iam_role.lambda_role.name
+  policy_arn = aws_iam_policy.lambda_dlq[0].arn
 }
 
 # IAM Policy for Lambda to access DynamoDB
@@ -119,4 +155,51 @@ resource "aws_iam_policy" "lambda_dynamodb" {
 resource "aws_iam_role_policy_attachment" "lambda_dynamodb" {
   role       = aws_iam_role.lambda_role.name
   policy_arn = aws_iam_policy.lambda_dynamodb.arn
+}
+
+# IAM Policy for Lambda to read from DLQ (for replay mechanism)
+resource "aws_iam_policy" "lambda_read_dlq" {
+  count       = var.environment == "live" ? 1 : 0
+  name        = "${var.function_name}-${var.environment}-read-dlq-policy"
+  description = "Allow Lambda to read messages from SQS DLQ for replay"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "sqs:ReceiveMessage",
+          "sqs:DeleteMessage",
+          "sqs:GetQueueAttributes"
+        ]
+        Resource = aws_sqs_queue.lambda_deadletter[0].arn
+      }
+    ]
+  })
+
+  tags = merge(var.tags, { Environment = var.environment })
+}
+
+resource "aws_iam_role_policy_attachment" "lambda_read_dlq" {
+  count      = var.environment == "live" ? 1 : 0
+  role       = aws_iam_role.lambda_role.name
+  policy_arn = aws_iam_policy.lambda_read_dlq[0].arn
+}
+
+# Event Source Mapping: DLQ processor (enabled for testing and replay)
+resource "aws_lambda_event_source_mapping" "dlq_processor" {
+  count            = var.environment == "live" ? 1 : 0
+  event_source_arn = aws_sqs_queue.lambda_deadletter[0].arn
+  function_name    = aws_lambda_function.function.arn
+  batch_size       = 1
+  enabled          = true
+  
+  # Report batch item failures to allow partial batch success
+  # Lambda can report which messages failed, and SQS will retry only those
+  function_response_types = ["ReportBatchItemFailures"]
+
+  depends_on = [
+    aws_iam_role_policy_attachment.lambda_read_dlq
+  ]
 }

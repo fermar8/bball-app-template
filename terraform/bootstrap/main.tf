@@ -162,6 +162,23 @@ resource "aws_iam_policy" "lambda_management" {
         Resource = [
           "arn:aws:lambda:${var.aws_region}:*:function:bball-app-template-*"
         ]
+      },
+      {
+        Sid    = "LambdaEventSourceMapping"
+        Effect = "Allow"
+        Action = [
+          "lambda:CreateEventSourceMapping",
+          "lambda:UpdateEventSourceMapping",
+          "lambda:DeleteEventSourceMapping",
+          "lambda:GetEventSourceMapping",
+          "lambda:ListEventSourceMappings",
+          "lambda:ListTags",
+          "lambda:TagResource",
+          "lambda:UntagResource"
+        ]
+        Resource = [
+          "arn:aws:lambda:${var.aws_region}:*:event-source-mapping:*"
+        ]
       }
     ]
   })

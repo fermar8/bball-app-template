@@ -33,3 +33,13 @@ output "dynamodb_table_arn" {
   description = "ARN of the DynamoDB table used by this Lambda"
   value       = aws_dynamodb_table.app_table.arn
 }
+
+output "lambda_deadletter_queue_url" {
+  description = "SQS DLQ URL for failed lambda runs"
+  value       = var.environment == "live" ? aws_sqs_queue.lambda_deadletter[0].url : null
+}
+
+output "lambda_deadletter_queue_arn" {
+  description = "SQS DLQ ARN for failed lambda runs"
+  value       = var.environment == "live" ? aws_sqs_queue.lambda_deadletter[0].arn : null
+}

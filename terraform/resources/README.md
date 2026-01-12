@@ -13,6 +13,7 @@ This directory contains **per-project Lambda infrastructure** that gets deployed
 - **EventBridge Rule**: Scheduled Lambda invocations (optional)
 
 ---
+- **SQS Dead Letter Queue (Live only)**: Stores failed events so they can be replayed later
 
 ## ⚙️ How It Works
 
@@ -336,6 +337,8 @@ terraform/resources/
 ├── variables.tf                        # Input variable declarations
 ├── nonlive.tfvars                      # Nonlive environment variable values
 ├── live.tfvars                         # Live environment variable values
+├── sqs-dlq.tf                          # Dead Letter Queue (live only)
+
 ```
 
 ---
