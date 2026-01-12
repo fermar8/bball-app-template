@@ -71,4 +71,9 @@ variable "scheduler_expression" {
   default     = "cron(0 9 * * ? *)"
 }
 
+variable "alarm_emails" {
+  description = "List of email addresses to receive CloudWatch alarm notifications"
+  type        = list(string)
+  default     = []
+}
 

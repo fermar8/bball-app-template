@@ -8,6 +8,11 @@ This directory contains **per-project Lambda infrastructure** that gets deployed
 - **DynamoDB Table**: Created per environment (nonlive/live)
 - **IAM Role**: Lambda execution permissions
 - **CloudWatch Logs**: Function logging
+- **CloudWatch Alarms**: Error monitoring (live environment only)
+- **SNS Topic**: Alarm notifications via email (live environment only)
+- **EventBridge Rule**: Scheduled Lambda invocations (optional)
+
+---
 - **SQS Dead Letter Queue (Live only)**: Stores failed events so they can be replayed later
 
 ## ⚙️ How It Works
@@ -143,6 +148,14 @@ TF_STATE_BUCKET       = tfstate-590183661886-eu-west-3
 TF_LOCK_TABLE         = terraform-state-lock
 ```
 
+**GitHub variables (optional):**
+```
+ALARM_EMAILS = ["email1@example.com", "email2@example.com"]
+```
+- Sets email addresses for CloudWatch alarm notifications (live environment only)
+- Each email will receive a confirmation email from AWS that must be confirmed
+- Leave empty to skip email notifications
+
 ---
 
 ## 📝 Variables Configuration
@@ -157,6 +170,50 @@ In `variables.tf`, these variables need values:
 | `environment` | Deployment environment (`nonlive` or `live`) | Pipeline (from branch) |
 | `aws_region` | AWS region | Pipeline (from GitHub secret) |
 | `function_name` | Lambda function base name | `variables.tf` default |
+| `alarm_emails` | List of emails for alarm notifications | Pipeline (from GitHub variable) |
+| `scheduler_enabled` | Enable/disable EventBridge scheduler | `tfvars` files |
+| `scheduler_expression` | Schedule expression (rate/cron) | `tfvars` files |
+
+---
+
+## 🔔 CloudWatch Alarms (Live Environment Only)
+
+CloudWatch alarms monitor your Lambda function for errors and throttling issues.
+
+### Reusing SNS Topic for alarms for New Lambdas
+
+The SNS topic can be shared across all Lambda functions:
+
+```hcl
+# For a new Lambda's error alarm
+resource "aws_cloudwatch_metric_alarm" "new_lambda_errors" {
+  count = var.environment == "live" ? 1 : 0
+  # ... alarm config ...
+  alarm_actions = [aws_sns_topic.lambda_alarms[0].arn]  # Same topic!
+}
+```
+
+All Lambda alarms send to the same email addresses.
+
+---
+
+## ⏰ EventBridge Scheduler
+
+Optional scheduled Lambda invocations using EventBridge Rules (FREE for scheduled rules).
+
+### Configuration
+
+Set in `tfvars` files:
+
+### Enable/Disable
+
+To enable the scheduler:
+1. Edit `nonlive.tfvars` or `live.tfvars`
+2. Set `scheduler_enabled = true`
+3. Commit and push
+4. Pipeline deploys the change
+
+No need to modify workflow files - configuration is in tfvars.
 
 ### Example Variable Usage
 
@@ -269,16 +326,19 @@ Pipeline automatically deploys the new resources! ✅
 
 ```
 terraform/resources/
-├── backend.tf           # Where to store Terraform state
-├── data.tf              # Reference bootstrap outputs
-├── variables.tf         # Input variables
-├── lambda.tf            # Lambda function configuration
-├── dynamodb.tf          # DynamoDB table (per environment)
-├── sqs-dlq.tf            # Dead Letter Queue (live only)
-├── event-bridge-event-rule-scheduler.tf  # Scheduled trigger (optional)
-├── outputs.tf           # Export values for other tools
-├── terraform.tfvars     # Variable values (optional, for local testing)
-└── README.md            # This file
+├── backend.tf                          # Where to store Terraform state
+├── cloudwatch-alarms.tf                # CloudWatch alarms and SNS topic (live only)
+├── data.tf                             # Reference bootstrap outputs
+├── dynamodb.tf                         # DynamoDB table (per environment)
+├── event-bridge-event-rule-scheduler.tf # EventBridge Rule for scheduled invocations
+├── lambda.tf                           # Lambda function configuration
+├── main.tf                             # Terraform and provider configuration
+├── outputs.tf                          # Export values for other tools
+├── variables.tf                        # Input variable declarations
+├── nonlive.tfvars                      # Nonlive environment variable values
+├── live.tfvars                         # Live environment variable values
+├── sqs-dlq.tf                          # Dead Letter Queue (live only)
+
 ```
 
 ---

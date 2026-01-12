@@ -157,11 +157,11 @@ jobs:
 
       - name: Terraform Plan
         working-directory: ./terraform/resources
-        run: terraform plan -var-file="live.tfvars" -no-color
+        run: terraform plan -var-file="live.tfvars" -var='alarm_emails=${{ vars.ALARM_EMAILS }}' -no-color
 
       - name: Terraform Apply
         working-directory: ./terraform/resources
-        run: terraform apply -var-file="live.tfvars" -auto-approve -no-color
+        run: terraform apply -var-file="live.tfvars" -var='alarm_emails=${{ vars.ALARM_EMAILS }}' -auto-approve -no-color
   create-release:
     name: Create GitHub Release
     runs-on: ubuntu-latest
