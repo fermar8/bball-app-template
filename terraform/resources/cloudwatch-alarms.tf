@@ -14,13 +14,13 @@ resource "aws_cloudwatch_metric_alarm" "lambda_errors" {
   count               = var.environment == "live" ? 1 : 0
   alarm_name          = "${var.function_name}-${var.environment}-errors"
   comparison_operator = "GreaterThanThreshold"
-  evaluation_periods  = 1
+  evaluation_periods  = 2
   metric_name         = "Errors"
   namespace           = "AWS/Lambda"
-  period              = 60
+  period              = 300  # 5 minutes
   statistic           = "Sum"
-  threshold           = 0
-  alarm_description   = "Triggers when Lambda function has errors"
+  threshold           = 0    # Alarm if 1 error
+  alarm_description   = "Triggers when Lambda function has sustained errors (>1 error in 2 consecutive 5-min periods)"
   treat_missing_data  = "notBreaching"
 
   dimensions = {
