@@ -171,7 +171,10 @@ resource "aws_iam_policy" "lambda_management" {
           "lambda:UpdateEventSourceMapping",
           "lambda:DeleteEventSourceMapping",
           "lambda:GetEventSourceMapping",
-          "lambda:ListEventSourceMappings"
+          "lambda:ListEventSourceMappings",
+          "lambda:ListTags",
+          "lambda:TagResource",
+          "lambda:UntagResource"
         ]
         Resource = [
           "arn:aws:lambda:${var.aws_region}:*:event-source-mapping:*"
