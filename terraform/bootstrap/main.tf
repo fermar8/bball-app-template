@@ -488,6 +488,7 @@ resource "aws_iam_policy" "additional_services" {
           "sns:SetTopicAttributes",
           "sns:Subscribe",
           "sns:Unsubscribe",
+          "sns:GetSubscriptionAttributes",
           "sns:ListSubscriptionsByTopic",
           "sns:ListTagsForResource",
           "sns:TagResource",
