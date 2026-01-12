@@ -195,12 +195,9 @@ resource "aws_lambda_event_source_mapping" "dlq_processor" {
   batch_size       = 1
   enabled          = true
   
-  # Retry attempts when processing messages from DLQ
+  # Report batch item failures to allow partial batch success
+  # Lambda can report which messages failed, and SQS will retry only those
   function_response_types = ["ReportBatchItemFailures"]
-  
-  # Maximum number of times to retry failed messages from DLQ
-  # After this, messages stay in DLQ for manual inspection
-  maximum_retry_attempts = 2
 
   depends_on = [
     aws_iam_role_policy_attachment.lambda_read_dlq
