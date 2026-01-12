@@ -294,6 +294,36 @@ resource "aws_iam_policy" "cloudwatch_logs" {
   }
 }
 
+# IAM Policy for CloudWatch Alarms
+resource "aws_iam_policy" "cloudwatch_alarms" {
+  name        = "bball-app-template-cloudwatch-alarms"
+  description = "Permissions for managing CloudWatch alarms"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "CloudWatchAlarmsManagement"
+        Effect = "Allow"
+        Action = [
+          "cloudwatch:PutMetricAlarm",
+          "cloudwatch:DeleteAlarms",
+          "cloudwatch:DescribeAlarms",
+          "cloudwatch:ListTagsForResource",
+          "cloudwatch:TagResource",
+          "cloudwatch:UntagResource"
+        ]
+        Resource = "arn:aws:cloudwatch:${var.aws_region}:*:alarm:bball-app-*"
+      }
+    ]
+  })
+
+  tags = {
+    Name      = "bball-app-template-cloudwatch-alarms"
+    ManagedBy = "terraform"
+  }
+}
+
 # IAM Policy for S3 (Terraform State)
 resource "aws_iam_policy" "s3_state_access" {
   name        = "bball-app-template-s3-state-access"
@@ -459,6 +489,7 @@ resource "aws_iam_policy" "additional_services" {
           "sns:Subscribe",
           "sns:Unsubscribe",
           "sns:ListSubscriptionsByTopic",
+          "sns:ListTagsForResource",
           "sns:TagResource",
           "sns:UntagResource"
         ]
@@ -545,6 +576,11 @@ resource "aws_iam_role_policy_attachment" "iam_management" {
 resource "aws_iam_role_policy_attachment" "cloudwatch_logs" {
   role       = aws_iam_role.github_actions_pipeline.name
   policy_arn = aws_iam_policy.cloudwatch_logs.arn
+}
+
+resource "aws_iam_role_policy_attachment" "cloudwatch_alarms" {
+  role       = aws_iam_role.github_actions_pipeline.name
+  policy_arn = aws_iam_policy.cloudwatch_alarms.arn
 }
 
 resource "aws_iam_role_policy_attachment" "s3_state_access" {
