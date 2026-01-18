@@ -9,6 +9,12 @@ variable "state_bucket_name" {
   type        = string
 }
 
+variable "nba_data_bucket_name" {
+  description = "S3 bucket name for NBA data storage"
+  type        = string
+  default     = "bball-app-nba-data"
+}
+
 variable "lock_table_name" {
   description = "Name of the DynamoDB table for state locking"
   type        = string

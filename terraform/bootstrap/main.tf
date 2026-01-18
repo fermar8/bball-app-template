@@ -112,7 +112,10 @@ resource "aws_iam_role" "github_actions_pipeline" {
             "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com"
           }
           StringLike = {
-            "token.actions.githubusercontent.com:sub" = "repo:${var.github_org}/${var.github_repo}:*"
+            "token.actions.githubusercontent.com:sub" = [
+              "repo:${var.github_org}/${var.github_repo}:*",
+              "repo:${var.github_org}/nba_api:*"
+            ]
           }
         }
       }
@@ -364,6 +367,31 @@ resource "aws_iam_policy" "s3_state_access" {
   }
 }
 
+# IAM Policy for S3 (nba-data bucket access)
+resource "aws_iam_role_policy" "pipeline_s3_access" {
+  name = "nba-data-s3-access"
+  role = aws_iam_role.github_actions_pipeline.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "s3:PutObject",
+          "s3:PutObjectAcl",
+          "s3:GetObject",
+          "s3:ListBucket"
+        ]
+        Resource = [
+          "arn:aws:s3:::${var.nba_data_bucket_name}",
+          "arn:aws:s3:::${var.nba_data_bucket_name}/*"
+        ]
+      }
+    ]
+  })
+}
+
 # IAM Policy for DynamoDB (Terraform State Locking)
 resource "aws_iam_policy" "dynamodb_state_lock" {
   name        = "bball-app-template-dynamodb-state-lock"
@@ -560,6 +588,56 @@ resource "aws_iam_policy" "additional_services" {
   tags = {
     Name      = "bball-app-template-additional-services"
     ManagedBy = "terraform"
+  }
+}
+
+resource "aws_s3_bucket" "nba_data" {
+  bucket = var.nba_data_bucket_name
+
+  tags = {
+    Name      = "bball-app-nba-data"
+    ManagedBy = "terraform"
+    Purpose   = "NBA API data storage"
+  }
+}
+
+resource "aws_s3_bucket_versioning" "nba_data" {
+  bucket = aws_s3_bucket.nba_data.id
+
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "nba_data" {
+  bucket = aws_s3_bucket.nba_data.id
+
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm = "AES256"
+    }
+  }
+}
+
+# Lifecycle policy to manage costs
+resource "aws_s3_bucket_lifecycle_configuration" "nba_data" {
+  bucket = aws_s3_bucket.nba_data.id
+
+  rule {
+    id     = "archive-old-data"
+    status = "Enabled"
+
+    filter {}
+
+    transition {
+      days          = 90
+      storage_class = "STANDARD_IA"
+    }
+
+    transition {
+      days          = 180
+      storage_class = "GLACIER"
+    }
   }
 }
 
