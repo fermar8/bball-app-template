@@ -53,6 +53,7 @@ htmlcov/
 .terraform/
 .terraform.lock.hcl
 backend.hcl
+backend-*.hcl
 
 # Lambda packages
 lambda.zip
@@ -73,3 +74,4 @@ Thumbs.db
 # Project specific
 bball-app-template
 response.json
+payload.json
