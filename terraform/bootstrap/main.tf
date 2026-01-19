@@ -112,7 +112,10 @@ resource "aws_iam_role" "github_actions_pipeline" {
             "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com"
           }
           StringLike = {
-            "token.actions.githubusercontent.com:sub" = "repo:${var.github_org}/${var.github_repo}:*"
+            "token.actions.githubusercontent.com:sub" = [
+              "repo:${var.github_org}/${var.github_repo}:*",
+              "repo:${var.github_org}/nba_api:*"
+            ]
           }
         }
       }
@@ -294,6 +297,36 @@ resource "aws_iam_policy" "cloudwatch_logs" {
   }
 }
 
+# IAM Policy for CloudWatch Alarms
+resource "aws_iam_policy" "cloudwatch_alarms" {
+  name        = "bball-app-template-cloudwatch-alarms"
+  description = "Permissions for managing CloudWatch alarms"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "CloudWatchAlarmsManagement"
+        Effect = "Allow"
+        Action = [
+          "cloudwatch:PutMetricAlarm",
+          "cloudwatch:DeleteAlarms",
+          "cloudwatch:DescribeAlarms",
+          "cloudwatch:ListTagsForResource",
+          "cloudwatch:TagResource",
+          "cloudwatch:UntagResource"
+        ]
+        Resource = "arn:aws:cloudwatch:${var.aws_region}:*:alarm:bball-app-*"
+      }
+    ]
+  })
+
+  tags = {
+    Name      = "bball-app-template-cloudwatch-alarms"
+    ManagedBy = "terraform"
+  }
+}
+
 # IAM Policy for S3 (Terraform State)
 resource "aws_iam_policy" "s3_state_access" {
   name        = "bball-app-template-s3-state-access"
@@ -332,6 +365,31 @@ resource "aws_iam_policy" "s3_state_access" {
     Name      = "bball-app-template-s3-state-access"
     ManagedBy = "terraform"
   }
+}
+
+# IAM Policy for S3 (nba-data bucket access)
+resource "aws_iam_role_policy" "pipeline_s3_access" {
+  name = "nba-data-s3-access"
+  role = aws_iam_role.github_actions_pipeline.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "s3:PutObject",
+          "s3:PutObjectAcl",
+          "s3:GetObject",
+          "s3:ListBucket"
+        ]
+        Resource = [
+          "arn:aws:s3:::${var.nba_data_bucket_name}",
+          "arn:aws:s3:::${var.nba_data_bucket_name}/*"
+        ]
+      }
+    ]
+  })
 }
 
 # IAM Policy for DynamoDB (Terraform State Locking)
@@ -458,7 +516,9 @@ resource "aws_iam_policy" "additional_services" {
           "sns:SetTopicAttributes",
           "sns:Subscribe",
           "sns:Unsubscribe",
+          "sns:GetSubscriptionAttributes",
           "sns:ListSubscriptionsByTopic",
+          "sns:ListTagsForResource",
           "sns:TagResource",
           "sns:UntagResource"
         ]
@@ -531,6 +591,56 @@ resource "aws_iam_policy" "additional_services" {
   }
 }
 
+resource "aws_s3_bucket" "nba_data" {
+  bucket = var.nba_data_bucket_name
+
+  tags = {
+    Name      = "bball-app-nba-data"
+    ManagedBy = "terraform"
+    Purpose   = "NBA API data storage"
+  }
+}
+
+resource "aws_s3_bucket_versioning" "nba_data" {
+  bucket = aws_s3_bucket.nba_data.id
+
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "nba_data" {
+  bucket = aws_s3_bucket.nba_data.id
+
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm = "AES256"
+    }
+  }
+}
+
+# Lifecycle policy to manage costs
+resource "aws_s3_bucket_lifecycle_configuration" "nba_data" {
+  bucket = aws_s3_bucket.nba_data.id
+
+  rule {
+    id     = "archive-old-data"
+    status = "Enabled"
+
+    filter {}
+
+    transition {
+      days          = 90
+      storage_class = "STANDARD_IA"
+    }
+
+    transition {
+      days          = 180
+      storage_class = "GLACIER"
+    }
+  }
+}
+
 # Attach all policies to the pipeline role
 resource "aws_iam_role_policy_attachment" "lambda_management" {
   role       = aws_iam_role.github_actions_pipeline.name
@@ -545,6 +655,11 @@ resource "aws_iam_role_policy_attachment" "iam_management" {
 resource "aws_iam_role_policy_attachment" "cloudwatch_logs" {
   role       = aws_iam_role.github_actions_pipeline.name
   policy_arn = aws_iam_policy.cloudwatch_logs.arn
+}
+
+resource "aws_iam_role_policy_attachment" "cloudwatch_alarms" {
+  role       = aws_iam_role.github_actions_pipeline.name
+  policy_arn = aws_iam_policy.cloudwatch_alarms.arn
 }
 
 resource "aws_iam_role_policy_attachment" "s3_state_access" {

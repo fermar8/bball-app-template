@@ -26,7 +26,7 @@ This is a **template project** that demonstrates:
 │   └── integration/        # Integration tests with moto (DynamoDB mocking)
 ├── terraform/
 │   ├── bootstrap/          # One-time infrastructure (roles, S3, OIDC)
-│   └── resources/          # Per-environment resources (Lambda, DynamoDB)
+│   └── resources/          # Per-environment resources (Lambda, DynamoDB, etc)
 ├── .github/
 │   └── workflows/          # CI/CD pipelines
 ├── requirements.txt        # Production dependencies (boto3, jsonschema)
