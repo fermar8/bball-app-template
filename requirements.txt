@@ -1,6 +1,9 @@
 # AWS SDK for DynamoDB
 boto3==1.34.162
 
+# Kaggle API for dataset downloads
+kaggle==1.6.17
+
 # JSON Schema validation
 jsonschema==4.21.1
 

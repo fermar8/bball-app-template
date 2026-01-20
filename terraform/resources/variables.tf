@@ -77,3 +77,15 @@ variable "alarm_emails" {
   default     = []
 }
 
+variable "kaggle_enabled" {
+  description = "Enable/disable Kaggle ingestion EventBridge rule"
+  type        = bool
+  default     = false
+}
+
+variable "kaggle_schedule_expression" {
+  description = "Schedule expression for Kaggle ingestion job (rate or cron)"
+  type        = string
+  default     = "rate(1 minute)"
+}
+
