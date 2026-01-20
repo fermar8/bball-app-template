@@ -207,6 +207,12 @@ def lambda_handler(event, context):
     logger.info("Processing Lambda request")
     logger.info(f"Event: {json.dumps(event)}")
 
+    # Route to Kaggle ingestion job if triggered by EventBridge scheduler
+    if event.get("job") == "kaggle_ingest":
+        logger.info("Routing to Kaggle ingestion job")
+        from src.jobs import kaggle_ingest
+        return kaggle_ingest.lambda_handler(event, context)
+
     # Force a failure to test retry and DLQ behavior
     if event.get("action") == "test_failure":
         logger.error("Simulating failure for DLQ testing")
