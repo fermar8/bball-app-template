@@ -71,6 +71,10 @@ resource "aws_lambda_function" "function" {
     variables = {
       ENVIRONMENT         = var.environment
       DYNAMODB_TABLE_NAME = aws_dynamodb_table.app_table.name
+      KAGGLE_SECRET_NAME  = var.kaggle_secret_name
+      KAGGLE_DATASET      = "eoinamoore/historical-nba-data-and-player-box-scores"
+      S3_DATA_BUCKET      = var.s3_data_bucket
+      S3_PREFIX           = var.s3_prefix
     }
   }
 
