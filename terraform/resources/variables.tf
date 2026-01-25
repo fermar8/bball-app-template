@@ -29,7 +29,7 @@ variable "environment" {
 variable "timeout" {
   description = "Lambda function timeout in seconds"
   type        = number
-  default     = 30
+  default     = 90
 }
 
 variable "project_name" {
