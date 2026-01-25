@@ -29,7 +29,7 @@ variable "environment" {
 variable "timeout" {
   description = "Lambda function timeout in seconds"
   type        = number
-  default     = 30
+  default     = 90
 }
 
 variable "project_name" {
@@ -75,5 +75,35 @@ variable "alarm_emails" {
   description = "List of email addresses to receive CloudWatch alarm notifications"
   type        = list(string)
   default     = []
+}
+
+variable "kaggle_secret_name" {
+  description = "Secrets Manager secret name holding Kaggle API credentials"
+  type        = string
+  default     = "kaggle-credentials"
+}
+
+variable "kaggle_enabled" {
+  description = "Enable/disable Kaggle ingestion EventBridge rule"
+  type        = bool
+  default     = false
+}
+
+variable "kaggle_schedule_expression" {
+  description = "Schedule expression for Kaggle ingestion job (rate or cron)"
+  type        = string
+  default     = "cron(0 5 * * ? *)"
+}
+
+variable "s3_data_bucket" {
+  description = "S3 bucket name for storing raw Kaggle datasets"
+  type        = string
+  default     = "bball-app-nba-data"
+}
+
+variable "s3_prefix" {
+  description = "S3 key prefix for Kaggle dataset snapshots"
+  type        = string
+  default     = "nba-data/kaggle"
 }
 
