@@ -28,11 +28,10 @@ def _load_kaggle_credentials():
     os.environ['KAGGLE_USERNAME'] = secret['username']
     os.environ['KAGGLE_KEY'] = secret['key']
     
-    # Create .kaggle directory for API
-    kaggle_dir = Path.home() / '.kaggle'
-    kaggle_dir.mkdir(exist_ok=True)
+    # Set Kaggle config dir to /tmp since home is read-only
+    os.environ['KAGGLE_CONFIG_DIR'] = '/tmp'
     
-    kaggle_json = kaggle_dir / 'kaggle.json'
+    kaggle_json = Path('/tmp/kaggle.json')
     kaggle_json.write_text(json.dumps({
         'username': secret['username'],
         'key': secret['key']
