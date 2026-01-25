@@ -28,9 +28,12 @@ def _load_kaggle_credentials():
     os.environ['KAGGLE_USERNAME'] = secret['username']
     os.environ['KAGGLE_KEY'] = secret['key']
     
-    # Set Kaggle config dir to /tmp since home is read-only
+    # Force HOME to /tmp so all libraries (including Kaggle) think that's the user home
+    # This bypasses any hardcoded checks for ~/.kaggle
+    os.environ['HOME'] = '/tmp'
     os.environ['KAGGLE_CONFIG_DIR'] = '/tmp'
     
+    # Create the config file in /tmp
     kaggle_json = Path('/tmp/kaggle.json')
     kaggle_json.write_text(json.dumps({
         'username': secret['username'],
