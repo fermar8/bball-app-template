@@ -2,15 +2,44 @@
 
 This directory contains the bootstrap configuration that sets up the **foundation infrastructure** for your serverless application. This should be deployed **once** and shared across all our Lambda projects.
 
+## 📁 File Structure
+
+```
+bootstrap/
+├── main.tf                          # Provider and version requirements
+├── variables.tf                     # Input variables (AWS region, bucket names, GitHub org/repo)
+├── outputs.tf                       # Outputs (state bucket, lock table, pipeline role ARN)
+├── s3-state-backend.tf              # S3 bucket + DynamoDB lock table for Terraform state
+├── github-oidc.tf                   # GitHub OIDC provider + pipeline IAM role
+├── s3-data-buckets.tf               # NBA data bucket with versioning and lifecycle policies
+├── iam-pipeline-permissions.tf      # IAM policies and role attachments for pipeline
+├── terraform.tfvars                 # Configuration values (should match your AWS account)
+├── backend-live.hcl                 # Backend config for live environment
+├── backend-nonlive.hcl              # Backend config for nonlive environment
+└── README.md                        # This file
+```
+
 ## 🏗️ What Gets Created
 
-### State Management
+### State Management (`s3-state-backend.tf`)
 - **S3 Bucket**: Stores Terraform state files for all projects
+  - Versioning enabled (prevents accidental state deletion)
+  - AES256 encryption (protects sensitive data)
+  - Public access blocked (security best practice)
 - **DynamoDB Table**: Provides state locking to prevent concurrent modifications
 
-### CI/CD Pipeline Authentication
-- **GitHub OIDC Provider**: Enables keyless authentication from GitHub Actions
+### CI/CD Pipeline Authentication (`github-oidc.tf`)
+- **GitHub OIDC Provider**: Enables keyless authentication from GitHub Actions (no AWS access keys needed)
 - **Pipeline IAM Role**: `bball-app-template-pipeline-role` with permissions to deploy Lambda functions and DynamoDB tables
+
+### Data Storage (`s3-data-buckets.tf`)
+- **NBA Data Bucket**: Stores NBA API data with versioning and lifecycle policies
+  - Transitions old data to cheaper storage tiers (STANDARD_IA → GLACIER)
+  - Reduces long-term storage costs
+
+### Pipeline Permissions (`iam-pipeline-permissions.tf`)
+- **8 IAM Policies**: Lambda management, IAM management, CloudWatch logs/alarms, S3, DynamoDB, EventBridge, SNS, SQS, API Gateway
+- **Policy Attachments**: All policies attached to the pipeline role with least-privilege scoping
 
 ### State Location
 - **State Key**: `bootstrap/roles-and-db-config.tfstate`
