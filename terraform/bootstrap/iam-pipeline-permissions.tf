@@ -316,7 +316,6 @@ resource "aws_iam_policy" "dynamodb_management" {
           "dynamodb:UpdateContinuousBackups"
         ]
         Resource = [
-          "arn:aws:dynamodb:${var.aws_region}:*:table/bball-app-*",
           "arn:aws:dynamodb:${var.aws_region}:*:table/${var.project_name}-*"
         ]
       }

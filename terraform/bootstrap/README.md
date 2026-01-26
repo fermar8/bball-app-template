@@ -14,8 +14,7 @@ bootstrap/
 ├── s3-data-buckets.tf               # NBA data bucket with versioning and lifecycle policies
 ├── iam-pipeline-permissions.tf      # IAM policies and role attachments for pipeline
 ├── terraform.tfvars                 # Configuration values (should match your AWS account)
-├── backend-live.hcl                 # Backend config for live environment
-├── backend-nonlive.hcl              # Backend config for nonlive environment
+
 └── README.md                        # This file
 ```
 

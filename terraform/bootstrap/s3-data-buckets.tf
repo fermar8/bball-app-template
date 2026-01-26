@@ -4,6 +4,7 @@ resource "aws_s3_bucket" "nba_data" {
   tags = {
     Name      = "bball-app-nba-data"
     ManagedBy = "terraform"
+    Project   = "bball-app-template"
     Purpose   = "NBA API data storage"
   }
 }
@@ -26,6 +27,15 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "nba_data" {
   }
 }
 
+resource "aws_s3_bucket_public_access_block" "nba_data" {
+  bucket = aws_s3_bucket.nba_data.id
+
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
 # Lifecycle policy to manage costs
 resource "aws_s3_bucket_lifecycle_configuration" "nba_data" {
   bucket = aws_s3_bucket.nba_data.id
@@ -43,7 +53,7 @@ resource "aws_s3_bucket_lifecycle_configuration" "nba_data" {
 
     transition {
       days          = 180
-      storage_class = "GLACIER"
+      storage_class = "GLACIER_IR"
     }
   }
 }
