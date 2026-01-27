@@ -237,9 +237,9 @@ resource "aws_iam_policy" "s3_state_access" {
 }
 
 # IAM Policy for S3 (nba-data bucket access)
-resource "aws_iam_role_policy" "pipeline_s3_access" {
-  name = "nba-data-s3-access"
-  role = aws_iam_role.github_actions_pipeline.id
+resource "aws_iam_policy" "pipeline_s3_access" {
+  name        = "bball-app-template-nba-data-s3-access"
+  description = "Permissions for S3 NBA data bucket access"
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -259,6 +259,11 @@ resource "aws_iam_role_policy" "pipeline_s3_access" {
       }
     ]
   })
+
+  tags = {
+    Name      = "bball-app-template-nba-data-s3-access"
+    ManagedBy = "terraform"
+  }
 }
 
 # IAM Policy for DynamoDB (Terraform State Locking)
@@ -429,6 +434,23 @@ resource "aws_iam_policy" "additional_services" {
           "arn:aws:apigateway:${var.aws_region}::/restapis/*"
         ]
       },
+    ]
+  })
+
+  tags = {
+    Name      = "bball-app-template-additional-services"
+    ManagedBy = "terraform"
+  }
+}
+
+# IAM Policy for S3 Bucket Management
+resource "aws_iam_policy" "s3_bucket_management" {
+  name        = "bball-app-template-s3-bucket-management"
+  description = "Permissions for managing S3 buckets and configurations"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
       {
         Sid    = "S3BucketManagement"
         Effect = "Allow"
@@ -445,7 +467,9 @@ resource "aws_iam_policy" "additional_services" {
           "s3:GetBucketPublicAccessBlock",
           "s3:PutBucketPublicAccessBlock",
           "s3:GetEncryptionConfiguration",
-          "s3:PutEncryptionConfiguration"
+          "s3:PutEncryptionConfiguration",
+          "s3:GetLifecycleConfiguration",
+          "s3:PutLifecycleConfiguration"
         ]
         Resource = [
           "arn:aws:s3:::bball-app-*",
@@ -456,7 +480,7 @@ resource "aws_iam_policy" "additional_services" {
   })
 
   tags = {
-    Name      = "bball-app-template-additional-services"
+    Name      = "bball-app-template-s3-bucket-management"
     ManagedBy = "terraform"
   }
 }
@@ -495,6 +519,14 @@ resource "aws_iam_role_policy_attachment" "dynamodb_state_lock" {
 resource "aws_iam_role_policy_attachment" "dynamodb_management" {
   role       = aws_iam_role.github_actions_pipeline.name
   policy_arn = aws_iam_policy.dynamodb_management.arn
+}
+resource "aws_iam_role_policy_attachment" "s3_bucket_management" {
+  role       = aws_iam_role.github_actions_pipeline.name
+  policy_arn = aws_iam_policy.s3_bucket_management.arn
+}
+resource "aws_iam_role_policy_attachment" "pipeline_s3_access" {
+  role       = aws_iam_role.github_actions_pipeline.name
+  policy_arn = aws_iam_policy.pipeline_s3_access.arn
 }
 
 resource "aws_iam_role_policy_attachment" "additional_services" {
