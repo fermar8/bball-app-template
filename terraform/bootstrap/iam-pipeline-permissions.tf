@@ -1,6 +1,6 @@
 # IAM Policy for Lambda Management
 resource "aws_iam_policy" "lambda_management" {
-  name        = "bball-app-template-lambda-management"
+  name        = "${var.project_name}-template-lambda-management"
   description = "Permissions for managing Lambda functions and related resources"
 
   policy = jsonencode({
@@ -32,7 +32,7 @@ resource "aws_iam_policy" "lambda_management" {
           "lambda:ListFunctionEventInvokeConfigs"
         ]
         Resource = [
-          "arn:aws:lambda:${var.aws_region}:*:function:bball-app-template-*"
+          "arn:aws:lambda:${var.aws_region}:*:function:${var.project_name}-*"
         ]
       },
       {
@@ -56,14 +56,14 @@ resource "aws_iam_policy" "lambda_management" {
   })
 
   tags = {
-    Name      = "bball-app-template-lambda-management"
+    Name      = "${var.project_name}-template-lambda-management"
     ManagedBy = "terraform"
   }
 }
 
 # IAM Policy for IAM Management (for Lambda execution roles)
 resource "aws_iam_policy" "iam_management" {
-  name        = "bball-app-template-iam-management"
+  name        = "${var.project_name}-template-iam-management"
   description = "Permissions for managing IAM roles and policies for Lambda"
 
   policy = jsonencode({
@@ -88,7 +88,7 @@ resource "aws_iam_policy" "iam_management" {
           "iam:UpdateAssumeRolePolicy"
         ]
         Resource = [
-          "arn:aws:iam::*:role/bball-app-template-*"
+          "arn:aws:iam::*:role/${var.project_name}-*"
         ]
       },
       {
@@ -106,7 +106,7 @@ resource "aws_iam_policy" "iam_management" {
           "iam:UntagPolicy"
         ]
         Resource = [
-          "arn:aws:iam::*:policy/bball-app-template-*"
+          "arn:aws:iam::*:policy/${var.project_name}-*"
         ]
       },
       {
@@ -117,21 +117,21 @@ resource "aws_iam_policy" "iam_management" {
           "iam:DetachRolePolicy"
         ]
         Resource = [
-          "arn:aws:iam::*:role/bball-app-template-*"
+          "arn:aws:iam::*:role/${var.project_name}-*"
         ]
       }
     ]
   })
 
   tags = {
-    Name      = "bball-app-template-iam-management"
+    Name      = "${var.project_name}-template-iam-management"
     ManagedBy = "terraform"
   }
 }
 
 # IAM Policy for CloudWatch Logs
 resource "aws_iam_policy" "cloudwatch_logs" {
-  name        = "bball-app-template-cloudwatch-logs"
+  name        = "${var.project_name}-template-cloudwatch-logs"
   description = "Permissions for managing CloudWatch log groups"
 
   policy = jsonencode({
@@ -152,8 +152,8 @@ resource "aws_iam_policy" "cloudwatch_logs" {
           "logs:DeleteRetentionPolicy"
         ]
         Resource = [
-          "arn:aws:logs:${var.aws_region}:*:log-group:/aws/lambda/bball-app-template-*",
-          "arn:aws:logs:${var.aws_region}:*:log-group:/aws/lambda/bball-app-template-*:*",
+          "arn:aws:logs:${var.aws_region}:*:log-group:/aws/lambda/${var.project_name}-*",
+          "arn:aws:logs:${var.aws_region}:*:log-group:/aws/lambda/${var.project_name}-*:*",
           "arn:aws:logs:${var.aws_region}:*:log-group::log-stream:*"
         ]
       }
@@ -161,14 +161,14 @@ resource "aws_iam_policy" "cloudwatch_logs" {
   })
 
   tags = {
-    Name      = "bball-app-template-cloudwatch-logs"
+    Name      = "${var.project_name}-template-cloudwatch-logs"
     ManagedBy = "terraform"
   }
 }
 
 # IAM Policy for CloudWatch Alarms
 resource "aws_iam_policy" "cloudwatch_alarms" {
-  name        = "bball-app-template-cloudwatch-alarms"
+  name        = "${var.project_name}-template-cloudwatch-alarms"
   description = "Permissions for managing CloudWatch alarms"
 
   policy = jsonencode({
@@ -185,20 +185,20 @@ resource "aws_iam_policy" "cloudwatch_alarms" {
           "cloudwatch:TagResource",
           "cloudwatch:UntagResource"
         ]
-        Resource = "arn:aws:cloudwatch:${var.aws_region}:*:alarm:bball-app-*"
+        Resource = "arn:aws:cloudwatch:${var.aws_region}:*:alarm:${var.project_name}-*"
       }
     ]
   })
 
   tags = {
-    Name      = "bball-app-template-cloudwatch-alarms"
+    Name      = "${var.project_name}-template-cloudwatch-alarms"
     ManagedBy = "terraform"
   }
 }
 
 # IAM Policy for S3 (Terraform State)
 resource "aws_iam_policy" "s3_state_access" {
-  name        = "bball-app-template-s3-state-access"
+  name        = "${var.project_name}-template-s3-state-access"
   description = "Permissions for S3 terraform state access"
 
   policy = jsonencode({
@@ -231,14 +231,14 @@ resource "aws_iam_policy" "s3_state_access" {
   })
 
   tags = {
-    Name      = "bball-app-template-s3-state-access"
+    Name      = "${var.project_name}-template-s3-state-access"
     ManagedBy = "terraform"
   }
 }
 
 # IAM Policy for S3 (nba-data bucket access)
 resource "aws_iam_policy" "pipeline_s3_access" {
-  name        = "bball-app-template-nba-data-s3-access"
+  name        = "${var.project_name}-template-nba-data-s3-access"
   description = "Permissions for S3 NBA data bucket access"
 
   policy = jsonencode({
@@ -261,14 +261,14 @@ resource "aws_iam_policy" "pipeline_s3_access" {
   })
 
   tags = {
-    Name      = "bball-app-template-nba-data-s3-access"
+    Name      = "${var.project_name}-template-nba-data-s3-access"
     ManagedBy = "terraform"
   }
 }
 
 # IAM Policy for DynamoDB (Terraform State Locking)
 resource "aws_iam_policy" "dynamodb_state_lock" {
-  name        = "bball-app-template-dynamodb-state-lock"
+  name        = "${var.project_name}-template-dynamodb-state-lock"
   description = "Permissions for DynamoDB state locking"
 
   policy = jsonencode({
@@ -291,14 +291,14 @@ resource "aws_iam_policy" "dynamodb_state_lock" {
   })
 
   tags = {
-    Name      = "bball-app-template-dynamodb-state-lock"
+    Name      = "${var.project_name}-template-dynamodb-state-lock"
     ManagedBy = "terraform"
   }
 }
 
 # IAM Policy for DynamoDB Table Management
 resource "aws_iam_policy" "dynamodb_management" {
-  name        = "bball-app-template-dynamodb-management"
+  name        = "${var.project_name}-template-dynamodb-management"
   description = "Permissions for managing DynamoDB tables"
 
   policy = jsonencode({
@@ -328,14 +328,14 @@ resource "aws_iam_policy" "dynamodb_management" {
   })
 
   tags = {
-    Name      = "bball-app-template-dynamodb-management"
+    Name      = "${var.project_name}-template-dynamodb-management"
     ManagedBy = "terraform"
   }
 }
 
 # IAM Policy for Additional AWS Services (EventBridge, SNS, SQS, etc.)
 resource "aws_iam_policy" "additional_services" {
-  name        = "bball-app-template-additional-services"
+  name        = "${var.project_name}-template-additional-services"
   description = "Permissions for EventBridge Scheduler, SNS, SQS, and other common services"
 
   policy = jsonencode({
@@ -355,7 +355,6 @@ resource "aws_iam_policy" "additional_services" {
           "scheduler:ListTagsForResource"
         ]
         Resource = [
-          "arn:aws:scheduler:${var.aws_region}:*:schedule/default/bball-app-*",
           "arn:aws:scheduler:${var.aws_region}:*:schedule/default/${var.project_name}-*"
         ]
       },
@@ -377,7 +376,6 @@ resource "aws_iam_policy" "additional_services" {
           "events:ListTagsForResource"
         ]
         Resource = [
-          "arn:aws:events:${var.aws_region}:*:rule/bball-app-*",
           "arn:aws:events:${var.aws_region}:*:rule/${var.project_name}-*"
         ]
       },
@@ -398,7 +396,6 @@ resource "aws_iam_policy" "additional_services" {
           "sns:UntagResource"
         ]
         Resource = [
-          "arn:aws:sns:${var.aws_region}:*:bball-app-*",
           "arn:aws:sns:${var.aws_region}:*:${var.project_name}-*"
         ]
       },
@@ -415,7 +412,6 @@ resource "aws_iam_policy" "additional_services" {
           "sqs:ListQueueTags"
         ]
         Resource = [
-          "arn:aws:sqs:${var.aws_region}:*:bball-app-*",
           "arn:aws:sqs:${var.aws_region}:*:${var.project_name}-*"
         ]
       },
@@ -438,14 +434,14 @@ resource "aws_iam_policy" "additional_services" {
   })
 
   tags = {
-    Name      = "bball-app-template-additional-services"
+    Name      = "${var.project_name}-template-additional-services"
     ManagedBy = "terraform"
   }
 }
 
 # IAM Policy for S3 Bucket Management
 resource "aws_iam_policy" "s3_bucket_management" {
-  name        = "bball-app-template-s3-bucket-management"
+  name        = "${var.project_name}-template-s3-bucket-management"
   description = "Permissions for managing S3 buckets and configurations"
 
   policy = jsonencode({
@@ -472,7 +468,6 @@ resource "aws_iam_policy" "s3_bucket_management" {
           "s3:PutLifecycleConfiguration"
         ]
         Resource = [
-          "arn:aws:s3:::bball-app-*",
           "arn:aws:s3:::${var.project_name}-*"
         ]
       }
@@ -480,7 +475,7 @@ resource "aws_iam_policy" "s3_bucket_management" {
   })
 
   tags = {
-    Name      = "bball-app-template-s3-bucket-management"
+    Name      = "${var.project_name}-template-s3-bucket-management"
     ManagedBy = "terraform"
   }
 }
