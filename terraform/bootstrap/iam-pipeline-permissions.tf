@@ -61,10 +61,10 @@ resource "aws_iam_policy" "lambda_management" {
   }
 }
 
-# IAM Policy for IAM Management (for Lambda execution roles)
+# IAM Policy for IAM Management (for Lambda execution roles and EC2 instance profiles)
 resource "aws_iam_policy" "iam_management" {
   name        = "${var.project_name}-template-iam-management"
-  description = "Permissions for managing IAM roles and policies for Lambda"
+  description = "Permissions for managing IAM roles and policies"
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -119,6 +119,22 @@ resource "aws_iam_policy" "iam_management" {
         Resource = [
           "arn:aws:iam::*:role/${var.project_name}-*"
         ]
+      },
+      {
+        Sid    = "InstanceProfileManagement"
+        Effect = "Allow"
+        Action = [
+          "iam:CreateInstanceProfile",
+          "iam:DeleteInstanceProfile",
+          "iam:GetInstanceProfile",
+          "iam:ListInstanceProfiles",
+          "iam:AddRoleToInstanceProfile",
+          "iam:RemoveRoleFromInstanceProfile",
+          "iam:ListInstanceProfilesForRole",
+          "iam:TagInstanceProfile",
+          "iam:UntagInstanceProfile"
+        ]
+        Resource = "arn:aws:iam::*:instance-profile/${var.project_name}-*"
       }
     ]
   })
@@ -129,16 +145,17 @@ resource "aws_iam_policy" "iam_management" {
   }
 }
 
-# IAM Policy for CloudWatch Logs
-resource "aws_iam_policy" "cloudwatch_logs" {
-  name        = "${var.project_name}-template-cloudwatch-logs"
-  description = "Permissions for managing CloudWatch log groups"
+# IAM Policy for CloudWatch (Logs and Alarms)
+# Consolidated: cloudwatch_logs + cloudwatch_alarms + cloudwatch_logs_ec2
+resource "aws_iam_policy" "cloudwatch_management" {
+  name        = "${var.project_name}-template-cloudwatch-management"
+  description = "Permissions for managing CloudWatch log groups and alarms for Lambda and EC2 services"
 
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
       {
-        Sid    = "CloudWatchLogsManagement"
+        Sid    = "CloudWatchLogsLambda"
         Effect = "Allow"
         Action = [
           "logs:CreateLogGroup",
@@ -148,6 +165,8 @@ resource "aws_iam_policy" "cloudwatch_logs" {
           "logs:ListTagsForResource",
           "logs:TagLogGroup",
           "logs:UntagLogGroup",
+          "logs:TagResource",
+          "logs:UntagResource",
           "logs:PutRetentionPolicy",
           "logs:DeleteRetentionPolicy"
         ]
@@ -156,24 +175,28 @@ resource "aws_iam_policy" "cloudwatch_logs" {
           "arn:aws:logs:${var.aws_region}:*:log-group:/aws/lambda/${var.project_name}-*:*",
           "arn:aws:logs:${var.aws_region}:*:log-group::log-stream:*"
         ]
-      }
-    ]
-  })
-
-  tags = {
-    Name      = "${var.project_name}-template-cloudwatch-logs"
-    ManagedBy = "terraform"
-  }
-}
-
-# IAM Policy for CloudWatch Alarms
-resource "aws_iam_policy" "cloudwatch_alarms" {
-  name        = "${var.project_name}-template-cloudwatch-alarms"
-  description = "Permissions for managing CloudWatch alarms"
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
+      },
+      {
+        Sid    = "CloudWatchLogsEC2"
+        Effect = "Allow"
+        Action = [
+          "logs:CreateLogGroup",
+          "logs:DeleteLogGroup",
+          "logs:DescribeLogGroups",
+          "logs:ListTagsLogGroup",
+          "logs:ListTagsForResource",
+          "logs:TagLogGroup",
+          "logs:UntagLogGroup",
+          "logs:TagResource",
+          "logs:UntagResource",
+          "logs:PutRetentionPolicy",
+          "logs:DeleteRetentionPolicy"
+        ]
+        Resource = [
+          "arn:aws:logs:${var.aws_region}:*:log-group:/bball-app/*",
+          "arn:aws:logs:${var.aws_region}:*:log-group:/bball-app/*:*"
+        ]
+      },
       {
         Sid    = "CloudWatchAlarmsManagement"
         Effect = "Allow"
@@ -191,15 +214,16 @@ resource "aws_iam_policy" "cloudwatch_alarms" {
   })
 
   tags = {
-    Name      = "${var.project_name}-template-cloudwatch-alarms"
+    Name      = "${var.project_name}-template-cloudwatch-management"
     ManagedBy = "terraform"
   }
 }
 
-# IAM Policy for S3 (Terraform State)
-resource "aws_iam_policy" "s3_state_access" {
-  name        = "${var.project_name}-template-s3-state-access"
-  description = "Permissions for S3 terraform state access"
+# IAM Policy for S3 Management (State, Buckets, NBA Data)
+# Consolidated: s3_state_access + s3_bucket_management + pipeline_s3_access
+resource "aws_iam_policy" "s3_management" {
+  name        = "${var.project_name}-template-s3-management"
+  description = "Permissions for S3 terraform state, bucket management, and NBA data access"
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -226,25 +250,47 @@ resource "aws_iam_policy" "s3_state_access" {
         Resource = [
           "${aws_s3_bucket.terraform_state.arn}/*"
         ]
-      }
-    ]
-  })
-
-  tags = {
-    Name      = "${var.project_name}-template-s3-state-access"
-    ManagedBy = "terraform"
-  }
-}
-
-# IAM Policy for S3 (nba-data bucket access)
-resource "aws_iam_policy" "pipeline_s3_access" {
-  name        = "${var.project_name}-template-nba-data-s3-access"
-  description = "Permissions for S3 NBA data bucket access"
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
+      },
       {
+        Sid    = "S3BucketManagement"
+        Effect = "Allow"
+        Action = [
+          "s3:CreateBucket",
+          "s3:DeleteBucket",
+          "s3:GetBucketPolicy",
+          "s3:PutBucketPolicy",
+          "s3:DeleteBucketPolicy",
+          "s3:GetBucketVersioning",
+          "s3:PutBucketVersioning",
+          "s3:GetBucketTagging",
+          "s3:PutBucketTagging",
+          "s3:GetBucketPublicAccessBlock",
+          "s3:PutBucketPublicAccessBlock",
+          "s3:GetEncryptionConfiguration",
+          "s3:PutEncryptionConfiguration",
+          "s3:GetLifecycleConfiguration",
+          "s3:PutLifecycleConfiguration",
+          "s3:ListBucket"
+        ]
+        Resource = [
+          "arn:aws:s3:::${var.project_name}-*"
+        ]
+      },
+      {
+        Sid    = "S3ObjectAccess"
+        Effect = "Allow"
+        Action = [
+          "s3:PutObject",
+          "s3:PutObjectAcl",
+          "s3:GetObject",
+          "s3:DeleteObject"
+        ]
+        Resource = [
+          "arn:aws:s3:::${var.project_name}-*/*"
+        ]
+      },
+      {
+        Sid    = "S3NBADataAccess"
         Effect = "Allow"
         Action = [
           "s3:PutObject",
@@ -261,15 +307,16 @@ resource "aws_iam_policy" "pipeline_s3_access" {
   })
 
   tags = {
-    Name      = "${var.project_name}-template-nba-data-s3-access"
+    Name      = "${var.project_name}-template-s3-management"
     ManagedBy = "terraform"
   }
 }
 
-# IAM Policy for DynamoDB (Terraform State Locking)
-resource "aws_iam_policy" "dynamodb_state_lock" {
-  name        = "${var.project_name}-template-dynamodb-state-lock"
-  description = "Permissions for DynamoDB state locking"
+# IAM Policy for DynamoDB Management (State Locking and Table Management)
+# Consolidated: dynamodb_state_lock + dynamodb_management
+resource "aws_iam_policy" "dynamodb_management" {
+  name        = "${var.project_name}-template-dynamodb-management"
+  description = "Permissions for DynamoDB state locking and table management"
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -286,24 +333,7 @@ resource "aws_iam_policy" "dynamodb_state_lock" {
         Resource = [
           aws_dynamodb_table.terraform_locks.arn
         ]
-      }
-    ]
-  })
-
-  tags = {
-    Name      = "${var.project_name}-template-dynamodb-state-lock"
-    ManagedBy = "terraform"
-  }
-}
-
-# IAM Policy for DynamoDB Table Management
-resource "aws_iam_policy" "dynamodb_management" {
-  name        = "${var.project_name}-template-dynamodb-management"
-  description = "Permissions for managing DynamoDB tables"
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
+      },
       {
         Sid    = "DynamoDBTableManagement"
         Effect = "Allow"
@@ -333,10 +363,10 @@ resource "aws_iam_policy" "dynamodb_management" {
   }
 }
 
-# IAM Policy for Additional AWS Services (EventBridge, SNS, SQS, etc.)
+# IAM Policy for Additional AWS Services (EventBridge, SNS, SQS, API Gateway)
 resource "aws_iam_policy" "additional_services" {
   name        = "${var.project_name}-template-additional-services"
-  description = "Permissions for EventBridge Scheduler, SNS, SQS, and other common services"
+  description = "Permissions for EventBridge, SNS, SQS, and API Gateway"
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -429,7 +459,7 @@ resource "aws_iam_policy" "additional_services" {
           "arn:aws:apigateway:${var.aws_region}::/restapis",
           "arn:aws:apigateway:${var.aws_region}::/restapis/*"
         ]
-      },
+      }
     ]
   })
 
@@ -439,43 +469,161 @@ resource "aws_iam_policy" "additional_services" {
   }
 }
 
-# IAM Policy for S3 Bucket Management
-resource "aws_iam_policy" "s3_bucket_management" {
-  name        = "${var.project_name}-template-s3-bucket-management"
-  description = "Permissions for managing S3 buckets and configurations"
+# IAM Policy for EC2 Infrastructure (EC2, VPC, Cognito, SSM)
+# Consolidated: ec2_management + cognito_management + ssm_management
+resource "aws_iam_policy" "ec2_infrastructure" {
+  name        = "${var.project_name}-template-ec2-infrastructure"
+  description = "Permissions for EC2, VPC, Cognito, and SSM for EC2-based services"
 
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
       {
-        Sid    = "S3BucketManagement"
+        Sid    = "EC2InstanceManagement"
         Effect = "Allow"
         Action = [
-          "s3:CreateBucket",
-          "s3:DeleteBucket",
-          "s3:GetBucketPolicy",
-          "s3:PutBucketPolicy",
-          "s3:DeleteBucketPolicy",
-          "s3:GetBucketVersioning",
-          "s3:PutBucketVersioning",
-          "s3:GetBucketTagging",
-          "s3:PutBucketTagging",
-          "s3:GetBucketPublicAccessBlock",
-          "s3:PutBucketPublicAccessBlock",
-          "s3:GetEncryptionConfiguration",
-          "s3:PutEncryptionConfiguration",
-          "s3:GetLifecycleConfiguration",
-          "s3:PutLifecycleConfiguration"
+          "ec2:RunInstances",
+          "ec2:TerminateInstances",
+          "ec2:StartInstances",
+          "ec2:StopInstances",
+          "ec2:DescribeInstances",
+          "ec2:DescribeInstanceStatus",
+          "ec2:DescribeInstanceAttribute",
+          "ec2:DescribeInstanceTypes",
+          "ec2:ModifyInstanceAttribute",
+          "ec2:GetConsoleOutput",
+          "ec2:DescribeImages",
+          "ec2:DescribeTags",
+          "ec2:CreateTags",
+          "ec2:DeleteTags"
+        ]
+        Resource = "*"
+      },
+      {
+        Sid    = "EC2VPCManagement"
+        Effect = "Allow"
+        Action = [
+          "ec2:CreateVpc",
+          "ec2:DeleteVpc",
+          "ec2:DescribeVpcs",
+          "ec2:ModifyVpcAttribute",
+          "ec2:DescribeVpcAttribute",
+          "ec2:CreateSubnet",
+          "ec2:DeleteSubnet",
+          "ec2:DescribeSubnets",
+          "ec2:ModifySubnetAttribute",
+          "ec2:CreateInternetGateway",
+          "ec2:DeleteInternetGateway",
+          "ec2:AttachInternetGateway",
+          "ec2:DetachInternetGateway",
+          "ec2:DescribeInternetGateways",
+          "ec2:CreateRouteTable",
+          "ec2:DeleteRouteTable",
+          "ec2:DescribeRouteTables",
+          "ec2:CreateRoute",
+          "ec2:DeleteRoute",
+          "ec2:AssociateRouteTable",
+          "ec2:DisassociateRouteTable",
+          "ec2:CreateSecurityGroup",
+          "ec2:DeleteSecurityGroup",
+          "ec2:DescribeSecurityGroups",
+          "ec2:AuthorizeSecurityGroupIngress",
+          "ec2:RevokeSecurityGroupIngress",
+          "ec2:AuthorizeSecurityGroupEgress",
+          "ec2:RevokeSecurityGroupEgress",
+          "ec2:DescribeSecurityGroupRules",
+          "ec2:ModifySecurityGroupRules"
+        ]
+        Resource = "*"
+      },
+      {
+        Sid    = "EC2EIPManagement"
+        Effect = "Allow"
+        Action = [
+          "ec2:AllocateAddress",
+          "ec2:ReleaseAddress",
+          "ec2:AssociateAddress",
+          "ec2:DisassociateAddress",
+          "ec2:DescribeAddresses"
+        ]
+        Resource = "*"
+      },
+      {
+        Sid    = "EC2VolumeManagement"
+        Effect = "Allow"
+        Action = [
+          "ec2:DescribeVolumes",
+          "ec2:DescribeVolumeStatus",
+          "ec2:ModifyVolume"
+        ]
+        Resource = "*"
+      },
+      {
+        Sid    = "EC2KeyPairAndAMI"
+        Effect = "Allow"
+        Action = [
+          "ec2:DescribeKeyPairs",
+          "ec2:DescribeAvailabilityZones"
+        ]
+        Resource = "*"
+      },
+      {
+        Sid    = "CognitoUserPoolManagement"
+        Effect = "Allow"
+        Action = [
+          "cognito-idp:CreateUserPool",
+          "cognito-idp:DeleteUserPool",
+          "cognito-idp:DescribeUserPool",
+          "cognito-idp:UpdateUserPool",
+          "cognito-idp:ListUserPools",
+          "cognito-idp:ListTagsForResource",
+          "cognito-idp:TagResource",
+          "cognito-idp:UntagResource",
+          "cognito-idp:CreateUserPoolClient",
+          "cognito-idp:DeleteUserPoolClient",
+          "cognito-idp:DescribeUserPoolClient",
+          "cognito-idp:UpdateUserPoolClient",
+          "cognito-idp:ListUserPoolClients",
+          "cognito-idp:SetUserPoolMfaConfig",
+          "cognito-idp:GetUserPoolMfaConfig"
+        ]
+        Resource = "arn:aws:cognito-idp:${var.aws_region}:*:userpool/*"
+      },
+      {
+        Sid    = "SSMParameterManagement"
+        Effect = "Allow"
+        Action = [
+          "ssm:PutParameter",
+          "ssm:GetParameter",
+          "ssm:GetParameters",
+          "ssm:GetParametersByPath",
+          "ssm:DeleteParameter",
+          "ssm:DescribeParameters",
+          "ssm:ListTagsForResource",
+          "ssm:AddTagsToResource",
+          "ssm:RemoveTagsFromResource"
+        ]
+        Resource = "arn:aws:ssm:${var.aws_region}:*:parameter/${var.project_name}/*"
+      },
+      {
+        Sid    = "SSMRunCommand"
+        Effect = "Allow"
+        Action = [
+          "ssm:SendCommand",
+          "ssm:GetCommandInvocation",
+          "ssm:ListCommandInvocations",
+          "ssm:DescribeInstanceInformation"
         ]
         Resource = [
-          "arn:aws:s3:::${var.project_name}-*"
+          "arn:aws:ec2:${var.aws_region}:*:instance/*",
+          "arn:aws:ssm:${var.aws_region}::document/AWS-RunShellScript"
         ]
       }
     ]
   })
 
   tags = {
-    Name      = "${var.project_name}-template-s3-bucket-management"
+    Name      = "${var.project_name}-template-ec2-infrastructure"
     ManagedBy = "terraform"
   }
 }
@@ -491,40 +639,27 @@ resource "aws_iam_role_policy_attachment" "iam_management" {
   policy_arn = aws_iam_policy.iam_management.arn
 }
 
-resource "aws_iam_role_policy_attachment" "cloudwatch_logs" {
+resource "aws_iam_role_policy_attachment" "cloudwatch_management" {
   role       = aws_iam_role.github_actions_pipeline.name
-  policy_arn = aws_iam_policy.cloudwatch_logs.arn
+  policy_arn = aws_iam_policy.cloudwatch_management.arn
 }
 
-resource "aws_iam_role_policy_attachment" "cloudwatch_alarms" {
+resource "aws_iam_role_policy_attachment" "s3_management" {
   role       = aws_iam_role.github_actions_pipeline.name
-  policy_arn = aws_iam_policy.cloudwatch_alarms.arn
-}
-
-resource "aws_iam_role_policy_attachment" "s3_state_access" {
-  role       = aws_iam_role.github_actions_pipeline.name
-  policy_arn = aws_iam_policy.s3_state_access.arn
-}
-
-resource "aws_iam_role_policy_attachment" "dynamodb_state_lock" {
-  role       = aws_iam_role.github_actions_pipeline.name
-  policy_arn = aws_iam_policy.dynamodb_state_lock.arn
+  policy_arn = aws_iam_policy.s3_management.arn
 }
 
 resource "aws_iam_role_policy_attachment" "dynamodb_management" {
   role       = aws_iam_role.github_actions_pipeline.name
   policy_arn = aws_iam_policy.dynamodb_management.arn
 }
-resource "aws_iam_role_policy_attachment" "s3_bucket_management" {
-  role       = aws_iam_role.github_actions_pipeline.name
-  policy_arn = aws_iam_policy.s3_bucket_management.arn
-}
-resource "aws_iam_role_policy_attachment" "pipeline_s3_access" {
-  role       = aws_iam_role.github_actions_pipeline.name
-  policy_arn = aws_iam_policy.pipeline_s3_access.arn
-}
 
 resource "aws_iam_role_policy_attachment" "additional_services" {
   role       = aws_iam_role.github_actions_pipeline.name
   policy_arn = aws_iam_policy.additional_services.arn
+}
+
+resource "aws_iam_role_policy_attachment" "ec2_infrastructure" {
+  role       = aws_iam_role.github_actions_pipeline.name
+  policy_arn = aws_iam_policy.ec2_infrastructure.arn
 }

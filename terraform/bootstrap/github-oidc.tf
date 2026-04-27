@@ -41,7 +41,8 @@ resource "aws_iam_role" "github_actions_pipeline" {
             "token.actions.githubusercontent.com:sub" = [
               "repo:${var.github_org}/${var.github_repo}:*",
               "repo:${var.github_org}/nba_api:*",
-              "repo:${var.github_org}/bball-app-data_consumption:*"
+              "repo:${var.github_org}/bball-app-data_consumption:*",
+              "repo:${var.github_org}/bball-app-user_service:*"
             ]
           }
         }
