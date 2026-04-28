@@ -121,6 +121,17 @@ resource "aws_iam_policy" "iam_management" {
         ]
       },
       {
+        Sid    = "IAMInlinePolicyManagement"
+        Effect = "Allow"
+        Action = [
+          "iam:PutRolePolicy",
+          "iam:DeleteRolePolicy"
+        ]
+        Resource = [
+          "arn:aws:iam::*:role/${var.project_name}-*"
+        ]
+      },
+      {
         Sid    = "InstanceProfileManagement"
         Effect = "Allow"
         Action = [
@@ -193,8 +204,23 @@ resource "aws_iam_policy" "cloudwatch_management" {
           "logs:DeleteRetentionPolicy"
         ]
         Resource = [
-          "arn:aws:logs:${var.aws_region}:*:log-group:/bball-app/*",
-          "arn:aws:logs:${var.aws_region}:*:log-group:/bball-app/*:*"
+          "arn:aws:logs:${var.aws_region}:*:log-group:/${var.project_name}/*",
+          "arn:aws:logs:${var.aws_region}:*:log-group:/${var.project_name}/*:*"
+        ]
+      },
+      {
+        Sid    = "CloudWatchMetricFilters"
+        Effect = "Allow"
+        Action = [
+          "logs:PutMetricFilter",
+          "logs:DeleteMetricFilter",
+          "logs:DescribeMetricFilters"
+        ]
+        Resource = [
+          "arn:aws:logs:${var.aws_region}:*:log-group:/aws/lambda/${var.project_name}-*",
+          "arn:aws:logs:${var.aws_region}:*:log-group:/aws/lambda/${var.project_name}-*:*",
+          "arn:aws:logs:${var.aws_region}:*:log-group:/${var.project_name}/*",
+          "arn:aws:logs:${var.aws_region}:*:log-group:/${var.project_name}/*:*"
         ]
       },
       {
@@ -598,12 +624,21 @@ resource "aws_iam_policy" "ec2_infrastructure" {
           "ssm:GetParameters",
           "ssm:GetParametersByPath",
           "ssm:DeleteParameter",
-          "ssm:DescribeParameters",
           "ssm:ListTagsForResource",
           "ssm:AddTagsToResource",
           "ssm:RemoveTagsFromResource"
         ]
-        Resource = "arn:aws:ssm:${var.aws_region}:*:parameter/${var.project_name}/*"
+        Resource = [
+          "arn:aws:ssm:${var.aws_region}:*:parameter/${var.project_name}*/*"
+        ]
+      },
+      {
+        Sid    = "SSMParameterDescribe"
+        Effect = "Allow"
+        Action = [
+          "ssm:DescribeParameters"
+        ]
+        Resource = "*"
       },
       {
         Sid    = "SSMRunCommand"
