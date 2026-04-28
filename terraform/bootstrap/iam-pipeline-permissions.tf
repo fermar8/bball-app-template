@@ -516,6 +516,7 @@ resource "aws_iam_policy" "ec2_infrastructure" {
           "ec2:DescribeInstanceStatus",
           "ec2:DescribeInstanceAttribute",
           "ec2:DescribeInstanceTypes",
+          "ec2:DescribeInstanceCreditSpecifications",
           "ec2:ModifyInstanceAttribute",
           "ec2:GetConsoleOutput",
           "ec2:DescribeImages",
