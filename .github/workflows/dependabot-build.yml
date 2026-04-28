@@ -78,7 +78,7 @@ jobs:
 
       - name: Comment PR with status
         if: always()
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             const status = '${{ job.status }}' === 'success' ? '✅ All checks passed!' : '❌ Some checks failed';
