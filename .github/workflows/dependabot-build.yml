@@ -1,0 +1,92 @@
+name: Dependabot - Build and Test
+
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build-test-plan:
+    name: Build, Test, and Plan (Dependabot)
+    # Only run on Dependabot PRs
+    if: github.actor == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+      pull-requests: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6.0.2
+
+      - name: Setup Python
+        uses: actions/setup-python@v6.2.0
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+
+      - name: Run unit tests
+        run: poe test
+
+      - name: Run integration tests
+        run: poe test-integration
+
+      - name: Verify Lambda handler
+        run: |
+          python -c "from src.messaging.handler import lambda_handler; print('Lambda handler loaded successfully')"
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ vars.AWS_PIPELINE_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION || 'eu-west-3' }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: ~1.0
+
+      - name: Create backend config
+        working-directory: ./terraform/resources
+        run: |
+          cat > backend.hcl << EOF
+          bucket         = "${{ vars.TF_STATE_BUCKET }}"
+          key            = "resources/nonlive/bball-app-template.tfstate"
+          region         = "${{ vars.AWS_REGION || 'eu-west-3' }}"
+          dynamodb_table = "${{ vars.TF_LOCK_TABLE }}"
+          encrypt        = true
+          EOF
+
+      - name: Terraform Init
+        working-directory: ./terraform/resources
+        run: terraform init -backend-config=backend.hcl
+
+      - name: Terraform Validate
+        working-directory: ./terraform/resources
+        run: terraform validate
+
+      - name: Terraform Plan
+        working-directory: ./terraform/resources
+        run: terraform plan -var-file="nonlive.tfvars" -no-color
+
+      - name: Comment PR with status
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const status = '${{ job.status }}' === 'success' ? '✅ All checks passed!' : '❌ Some checks failed';
+            const comment = `### Dependabot Build Status\n\n${status}\n\n- Unit tests: ${{ steps.run-unit-tests.outcome || 'N/A' }}\n- Integration tests: ${{ steps.run-integration-tests.outcome || 'N/A' }}\n- Terraform validation: ${{ steps.terraform-validate.outcome || 'N/A' }}`;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
