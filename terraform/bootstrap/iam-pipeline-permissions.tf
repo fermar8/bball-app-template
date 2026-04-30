@@ -571,7 +571,8 @@ resource "aws_iam_policy" "ec2_infrastructure" {
           "ec2:ReleaseAddress",
           "ec2:AssociateAddress",
           "ec2:DisassociateAddress",
-          "ec2:DescribeAddresses"
+          "ec2:DescribeAddresses",
+          "ec2:DescribeAddressesAttribute"
         ]
         Resource = "*"
       },
@@ -651,8 +652,7 @@ resource "aws_iam_policy" "ec2_infrastructure" {
           "ssm:DescribeInstanceInformation"
         ]
         Resource = [
-          "arn:aws:ec2:${var.aws_region}:*:instance/*",
-          "arn:aws:ssm:${var.aws_region}::document/AWS-RunShellScript"
+          "*"
         ]
       }
     ]
@@ -660,6 +660,79 @@ resource "aws_iam_policy" "ec2_infrastructure" {
 
   tags = {
     Name      = "${var.project_name}-template-ec2-infrastructure"
+    ManagedBy = "terraform"
+  }
+}
+
+# IAM Policy for ECR Management (Docker Registry)
+resource "aws_iam_policy" "ecr_management" {
+  name        = "${var.project_name}-template-ecr-management"
+  description = "Permissions for managing ECR repositories and Docker images"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "ECRRepositoryManagement"
+        Effect = "Allow"
+        Action = [
+          "ecr:CreateRepository",
+          "ecr:DeleteRepository",
+          "ecr:DescribeRepositories",
+          "ecr:ListTagsForResource",
+          "ecr:TagResource",
+          "ecr:UntagResource",
+          "ecr:GetRepositoryPolicy",
+          "ecr:SetRepositoryPolicy",
+          "ecr:DeleteRepositoryPolicy",
+          "ecr:PutLifecyclePolicy",
+          "ecr:GetLifecyclePolicy",
+          "ecr:DeleteLifecyclePolicy"
+        ]
+        Resource = [
+          "arn:aws:ecr:${var.aws_region}:*:repository/${var.project_name}-user-service*"
+        ]
+      },
+      {
+        Sid    = "ECRAuthorizationToken"
+        Effect = "Allow"
+        Action = [
+          "ecr:GetAuthorizationToken"
+        ]
+        Resource = "*"
+      },
+      {
+        Sid    = "ECRImageManagement"
+        Effect = "Allow"
+        Action = [
+          "ecr:BatchCheckLayerAvailability",
+          "ecr:GetDownloadUrlForLayer",
+          "ecr:BatchGetImage",
+          "ecr:InitiateLayerUpload",
+          "ecr:UploadLayerPart",
+          "ecr:CompleteLayerUpload",
+          "ecr:PutImage",
+          "ecr:DescribeImages",
+          "ecr:ListImages",
+          "ecr:BatchDeleteImage"
+        ]
+        Resource = [
+          "arn:aws:ecr:${var.aws_region}:*:repository/${var.project_name}-user-service*"
+        ]
+      },
+      {
+        Sid    = "STSGetCallerIdentity"
+        Effect = "Allow"
+        Action = [
+          "sts:GetCallerIdentity"
+        ]
+        Resource = "*"
+      }
+    ]
+  })
+
+  tags = {
+    Name      = "${var.project_name}-template-ecr-management"
     ManagedBy = "terraform"
   }
 }
@@ -698,4 +771,9 @@ resource "aws_iam_role_policy_attachment" "additional_services" {
 resource "aws_iam_role_policy_attachment" "ec2_infrastructure" {
   role       = aws_iam_role.github_actions_pipeline.name
   policy_arn = aws_iam_policy.ec2_infrastructure.arn
+}
+
+resource "aws_iam_role_policy_attachment" "ecr_management" {
+  role       = aws_iam_role.github_actions_pipeline.name
+  policy_arn = aws_iam_policy.ecr_management.arn
 }
